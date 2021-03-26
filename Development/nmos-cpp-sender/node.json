@@ -1,0 +1,15 @@
+{
+    "logging_level": -20,
+    "http_port": 9080,
+    "domain": "local",
+    "label": "sony-nmos-desi-container",
+    "host_name": "sony-nmos-desi-container",
+    "how_many": 1,
+    "events_ws_port": 9081,
+    "registry_address": "172.17.0.3",
+    "registry_version": "v1.3",
+    "registration_port": 8080,
+    "system_port": 8080,
+    "system_address": "172.17.0.3",
+    "system_version": "v1.1"
+}

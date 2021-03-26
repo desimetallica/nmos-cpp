@@ -144,8 +144,8 @@ void node_implementation_thread(nmos::node_model& model, slog::base_gate& gate_)
     const auto node_id = impl::make_id(seed_id, nmos::types::node);
     const auto device_id = impl::make_id(seed_id, nmos::types::device);
     const auto how_many = impl::fields::how_many(model.settings);
-    const auto frame_rate = nmos::parse_rational(impl::fields::frame_rate(model.settings));
-    const auto channel_count = impl::fields::channel_count(model.settings);
+    //const auto frame_rate = nmos::parse_rational(impl::fields::frame_rate(model.settings));
+    //const auto channel_count = impl::fields::channel_count(model.settings);
     const auto smpte2022_7 = impl::fields::smpte2022_7(model.settings);
 
     // any delay between updates to the model resources is unnecessary
@@ -218,172 +218,6 @@ void node_implementation_thread(nmos::node_model& model, slog::base_gate& gate_)
         if (0 <= nmos::fields::events_port(model.settings)) boost::range::push_back(sender_ids, impl::make_ids(seed_id, nmos::types::sender, impl::ports::ws, how_many));
         auto receiver_ids = impl::make_ids(seed_id, nmos::types::receiver, impl::ports::all, how_many);
         if (!insert_resource_after(delay_millis, model.node_resources, nmos::make_device(device_id, node_id, sender_ids, receiver_ids, model.settings), gate)) return;
-    }
-
-    // example sources, flows and senders
-    for (int index = 0; index < how_many; ++index)
-    {
-        for (const auto& port : impl::ports::rtp)
-        {
-            const auto source_id = impl::make_id(seed_id, nmos::types::source, port, index);
-            const auto flow_id = impl::make_id(seed_id, nmos::types::flow, port, index);
-            const auto sender_id = impl::make_id(seed_id, nmos::types::sender, port, index);
-
-            nmos::resource source;
-            if (impl::ports::video == port)
-            {
-                source = nmos::make_video_source(source_id, device_id, nmos::clock_names::clk0, frame_rate, model.settings);
-            }
-            else if (impl::ports::audio == port)
-            {
-                const auto channels = boost::copy_range<std::vector<nmos::channel>>(boost::irange(0, channel_count) | boost::adaptors::transformed([&](const int& index)
-                {
-                    return impl::channels_repeat[index % (int)impl::channels_repeat.size()];
-                }));
-                    
-                source = nmos::make_audio_source(source_id, device_id, nmos::clock_names::clk0, frame_rate, channels, model.settings);
-            }
-            else if (impl::ports::data == port)
-            {
-                source = nmos::make_data_source(source_id, device_id, nmos::clock_names::clk0, frame_rate, model.settings);
-            }
-            impl::set_label(source, port, index);
-
-            nmos::resource flow;
-            if (impl::ports::video == port)
-            {
-                // for 1080i formats, ST 2110-20 says that "the fields of an interlaced image are transmitted in time order,
-                // first field first [and] the sample rows of the temporally second field are displaced vertically 'below' the
-                // like-numbered sample rows of the temporally first field."
-                const auto interlace_mode = nmos::rates::rate25 == frame_rate || nmos::rates::rate29_97 == frame_rate
-                    ? nmos::interlace_modes::interlaced_tff
-                    : nmos::interlace_modes::progressive;
-                flow = nmos::make_raw_video_flow(
-                    flow_id, source_id, device_id,
-                    frame_rate,
-                    1920, 1080, interlace_mode,
-                    nmos::colorspaces::BT709, nmos::transfer_characteristics::SDR, nmos::chroma_subsampling::YCbCr422, 10,
-                    model.settings
-                );
-            }
-            else if (impl::ports::audio == port)
-            {
-                flow = nmos::make_raw_audio_flow(flow_id, source_id, device_id, 48000, 24, model.settings);
-                // add optional grain_rate
-                flow.data[nmos::fields::grain_rate] = nmos::make_rational(frame_rate);
-            }
-            else if (impl::ports::data == port)
-            {
-                nmos::did_sdid timecode{ 0x60, 0x60 };
-                flow = nmos::make_sdianc_data_flow(flow_id, source_id, device_id, { timecode }, model.settings);
-                // add optional grain_rate
-                flow.data[nmos::fields::grain_rate] = nmos::make_rational(frame_rate);
-            }
-            impl::set_label(flow, port, index);
-
-            // set_transportfile needs to find the matching source and flow for the sender, so insert these first
-            if (!insert_resource_after(delay_millis, model.node_resources, std::move(source), gate)) return;
-            if (!insert_resource_after(delay_millis, model.node_resources, std::move(flow), gate)) return;
-
-            auto sender = nmos::make_sender(sender_id, flow_id, device_id, interface_names, model.settings);
-            impl::set_label(sender, port, index);
-            impl::insert_group_hint(sender, port, index);
-
-            auto connection_sender = nmos::make_connection_rtp_sender(sender_id, smpte2022_7);
-            // add some example constraints; these should be completed fully!
-            connection_sender.data[nmos::fields::endpoint_constraints][0][nmos::fields::source_ip] = value_of({
-                { nmos::fields::constraint_enum, value_from_elements(primary_interface.addresses) }
-            });
-            if (smpte2022_7) connection_sender.data[nmos::fields::endpoint_constraints][1][nmos::fields::source_ip] = value_of({
-                { nmos::fields::constraint_enum, value_from_elements(secondary_interface.addresses) }
-            });
-
-            // initialize this sender enabled, just to enable the IS-05-01 test suite to run immediately
-            connection_sender.data[nmos::fields::endpoint_active][nmos::fields::master_enable] = connection_sender.data[nmos::fields::endpoint_staged][nmos::fields::master_enable] = value::boolean(true);
-            resolve_auto(sender, connection_sender, connection_sender.data[nmos::fields::endpoint_active][nmos::fields::transport_params]);
-            set_transportfile(sender, connection_sender, connection_sender.data[nmos::fields::endpoint_transportfile]);
-            nmos::set_resource_subscription(sender, nmos::fields::master_enable(connection_sender.data[nmos::fields::endpoint_active]), {}, nmos::tai_now());
-
-            if (!insert_resource_after(delay_millis, model.node_resources, std::move(sender), gate)) return;
-            if (!insert_resource_after(delay_millis, model.connection_resources, std::move(connection_sender), gate)) return;
-        }
-    }
-
-    // example receivers
-    for (int index = 0; index < how_many; ++index)
-    {
-        for (const auto& port : impl::ports::rtp)
-        {
-            const auto receiver_id = impl::make_id(seed_id, nmos::types::receiver, port, index);
-
-            nmos::resource receiver;
-            if (impl::ports::video == port)
-            {
-                receiver = nmos::make_video_receiver(receiver_id, device_id, nmos::transports::rtp_mcast, interface_names, model.settings);
-                // add an example constraint set; these should be completed fully!
-                const auto interlace_modes = nmos::rates::rate25 == frame_rate || nmos::rates::rate29_97 == frame_rate
-                    ? std::vector<utility::string_t>{ nmos::interlace_modes::interlaced_bff.name, nmos::interlace_modes::interlaced_tff.name, nmos::interlace_modes::interlaced_psf.name }
-                    : std::vector<utility::string_t>{ nmos::interlace_modes::progressive.name };
-                receiver.data[nmos::fields::caps][nmos::fields::constraint_sets] = value_of({
-                    value_of({
-                        { nmos::caps::format::grain_rate, nmos::make_caps_rational_constraint({ frame_rate }) },
-                        { nmos::caps::format::frame_width, nmos::make_caps_integer_constraint({ 1920 }) },
-                        { nmos::caps::format::frame_height, nmos::make_caps_integer_constraint({ 1080 }) },
-                        { nmos::caps::format::interlace_mode, nmos::make_caps_string_constraint(interlace_modes) },
-                        { nmos::caps::format::color_sampling, nmos::make_caps_string_constraint({ sdp::samplings::YCbCr_4_2_2.name }) }
-                    })
-                });
-                receiver.data[nmos::fields::version] = receiver.data[nmos::fields::caps][nmos::fields::version] = value(nmos::make_version());
-            }
-            else if (impl::ports::audio == port)
-            {
-                receiver = nmos::make_audio_receiver(receiver_id, device_id, nmos::transports::rtp_mcast, interface_names, 24, model.settings);
-                // add some example constraint sets; these should be completed fully!
-                receiver.data[nmos::fields::caps][nmos::fields::constraint_sets] = value_of({
-                    value_of({
-                        { nmos::caps::format::channel_count, nmos::make_caps_integer_constraint({}, 1, channel_count) },
-                        { nmos::caps::format::sample_rate, nmos::make_caps_rational_constraint({ { 48000, 1 } }) },
-                        { nmos::caps::format::sample_depth, nmos::make_caps_integer_constraint({ 16, 24 }) },
-                        { nmos::caps::transport::packet_time, nmos::make_caps_number_constraint({ 0.125 }) }
-                    }),
-                    value_of({
-                        { nmos::caps::meta::preference, -1 },
-                        { nmos::caps::format::channel_count, nmos::make_caps_integer_constraint({}, 1, (std::min)(8, channel_count)) },
-                        { nmos::caps::format::sample_rate, nmos::make_caps_rational_constraint({ { 48000, 1 } }) },
-                        { nmos::caps::format::sample_depth, nmos::make_caps_integer_constraint({ 16, 24 }) },
-                        { nmos::caps::transport::packet_time, nmos::make_caps_number_constraint({ 1 }) }
-                    })
-                });
-                receiver.data[nmos::fields::version] = receiver.data[nmos::fields::caps][nmos::fields::version] = value(nmos::make_version());
-            }
-            else if (impl::ports::data == port)
-            {
-                receiver = nmos::make_sdianc_data_receiver(receiver_id, device_id, nmos::transports::rtp_mcast, interface_names, model.settings);
-                // add an example constraint set; these should be completed fully!
-                receiver.data[nmos::fields::caps][nmos::fields::constraint_sets] = value_of({
-                    value_of({
-                        { nmos::caps::format::grain_rate, nmos::make_caps_rational_constraint({ frame_rate }) }
-                    })
-                });
-                receiver.data[nmos::fields::version] = receiver.data[nmos::fields::caps][nmos::fields::version] = value(nmos::make_version());
-            }
-            impl::set_label(receiver, port, index);
-            impl::insert_group_hint(receiver, port, index);
-
-            auto connection_receiver = nmos::make_connection_rtp_receiver(receiver_id, smpte2022_7);
-            // add some example constraints; these should be completed fully!
-            connection_receiver.data[nmos::fields::endpoint_constraints][0][nmos::fields::interface_ip] = value_of({
-                { nmos::fields::constraint_enum, value_from_elements(primary_interface.addresses) }
-            });
-            if (smpte2022_7) connection_receiver.data[nmos::fields::endpoint_constraints][1][nmos::fields::interface_ip] = value_of({
-                { nmos::fields::constraint_enum, value_from_elements(secondary_interface.addresses) }
-            });
-
-            resolve_auto(receiver, connection_receiver, connection_receiver.data[nmos::fields::endpoint_active][nmos::fields::transport_params]);
-
-            if (!insert_resource_after(delay_millis, model.node_resources, std::move(receiver), gate)) return;
-            if (!insert_resource_after(delay_millis, model.connection_resources, std::move(connection_receiver), gate)) return;
-        }
     }
 
     // example event sources, senders, flows
@@ -466,6 +300,7 @@ void node_implementation_thread(nmos::node_model& model, slog::base_gate& gate_)
         }
     }
 
+/*
     // example event receivers
     for (int index = 0; index < how_many; ++index)
     {
@@ -499,6 +334,7 @@ void node_implementation_thread(nmos::node_model& model, slog::base_gate& gate_)
             impl::set_label(receiver, port, index);
             impl::insert_group_hint(receiver, port, index);
 
+            
             auto connection_receiver = nmos::make_connection_events_websocket_receiver(receiver_id, model.settings);
             resolve_auto(receiver, connection_receiver, connection_receiver.data[nmos::fields::endpoint_active][nmos::fields::transport_params]);
 
@@ -506,174 +342,7 @@ void node_implementation_thread(nmos::node_model& model, slog::base_gate& gate_)
             if (!insert_resource_after(delay_millis, model.connection_resources, std::move(connection_receiver), gate)) return;
         }
     }
-
-    // example audio inputs
-
-    for (int index = 0; index < how_many; ++index)
-    {
-        const auto stri = utility::conversions::details::to_string_t(index);
-
-        const auto id = U("input") + stri;
-
-        const auto name = U("IP Input ") + stri;
-        const auto description = U("SMPTE 2110-30 IP Input ") + stri;
-
-        const auto receiver_id = impl::make_id(seed_id, nmos::types::receiver, impl::ports::audio, index);
-        const auto parent = std::pair<nmos::id, nmos::type>(receiver_id, nmos::types::receiver);
-
-        const auto channel_labels = boost::copy_range<std::vector<utility::string_t>>(boost::irange(0, channel_count) | boost::adaptors::transformed([&](const int& index)
-        {
-            return impl::channels_repeat[index % (int)impl::channels_repeat.size()].label;
-        }));
-
-        // use default input capabilities to indicate no constraints
-        auto channelmapping_input = nmos::make_channelmapping_input(id, name, description, parent, channel_labels);
-        if (!insert_resource_after(delay_millis, model.channelmapping_resources, std::move(channelmapping_input), gate)) return;
-    }
-
-    // example audio outputs
-
-    for (int index = 0; index < how_many; ++index)
-    {
-        const auto stri = utility::conversions::details::to_string_t(index);
-
-        const auto id = U("output") + stri;
-
-        const auto name = U("IP Output ") + stri;
-        const auto description = U("SMPTE 2110-30 IP Output ") + stri;
-
-        const auto source_id = impl::make_id(seed_id, nmos::types::source, impl::ports::audio, index);
-
-        const auto channel_labels = boost::copy_range<std::vector<utility::string_t>>(boost::irange(0, channel_count) | boost::adaptors::transformed([&](const int& index)
-        {
-            return impl::channels_repeat[index % (int)impl::channels_repeat.size()].label;
-        }));
-
-        // omit routable inputs to indicate no restrictions
-        auto channelmapping_output = nmos::make_channelmapping_output(id, name, description, source_id, channel_labels);
-        if (!insert_resource_after(delay_millis, model.channelmapping_resources, std::move(channelmapping_output), gate)) return;
-    }
-
-    // example non-IP audio input
-    const int input_block_size = 8;
-    const int input_block_count = 8;
-    {
-        const auto id = U("inputA");
-
-        const auto name = U("MADI Input A");
-        const auto description = U("MADI Input A");
-
-        // non-IP audio inputs have no parent
-        const auto parent = std::pair<nmos::id, nmos::type>();
-
-        const auto channel_labels = boost::copy_range<std::vector<utility::string_t>>(boost::irange(0, input_block_size * input_block_count) | boost::adaptors::transformed([](const int& index)
-        {
-            return nmos::channel_symbols::Undefined(1 + index).name;
-        }));
-
-        // some example constraints; this input's channels can only be used in blocks and the channels cannot be reordered within each block
-        const auto reordering = false;
-        const auto block_size = input_block_size;
-
-        auto channelmapping_input = nmos::make_channelmapping_input(id, name, description, parent, channel_labels, reordering, block_size);
-        if (!insert_resource_after(delay_millis, model.channelmapping_resources, std::move(channelmapping_input), gate)) return;
-    }
-
-    // example outputs to some audio gizmo
-
-    {
-        const auto id = U("outputX");
-
-        const auto name = U("Gizmo Output X");
-        const auto description = U("Gizmo Output X");
-
-        const auto source_id = impl::make_id(seed_id, nmos::types::source, impl::ports::audio, how_many);
-
-        const auto channel_labels = boost::copy_range<std::vector<utility::string_t>>(boost::irange(0, input_block_size) | boost::adaptors::transformed([](const int& index)
-        {
-            return nmos::channel_symbols::Undefined(1 + index).name;
-        }));
-
-        // some example constraints; only allow inputs from the example non-IP audio input
-        auto routable_inputs = std::vector<nmos::channelmapping_id>{ U("inputA") };
-        // do not allow unrouted channels
-
-        // start with a valid active map
-        auto active_map = boost::copy_range<std::vector<std::pair<nmos::channelmapping_id, uint32_t>>>(boost::irange(0, input_block_size) | boost::adaptors::transformed([](const int& index)
-        {
-            return std::pair<nmos::channelmapping_id, uint32_t>{ U("inputA"), index };
-        }));
-
-        auto channelmapping_output = nmos::make_channelmapping_output(id, name, description, source_id, channel_labels, routable_inputs, active_map);
-        if (!insert_resource_after(delay_millis, model.channelmapping_resources, std::move(channelmapping_output), gate)) return;
-    }
-
-    // example source for some audio gizmo
-
-    {
-        const auto source_id = impl::make_id(seed_id, nmos::types::source, impl::ports::audio, how_many);
-
-        const auto channels = boost::copy_range<std::vector<nmos::channel>>(boost::irange(0, input_block_size) | boost::adaptors::transformed([](const int& index)
-        {
-            return nmos::channel{ {}, nmos::channel_symbols::Undefined(1 + index) };
-        }));
-
-        auto source = nmos::make_audio_source(source_id, device_id, nmos::clock_names::clk0, frame_rate, channels, model.settings);
-        impl::set_label(source, impl::ports::audio, how_many);
-
-        if (!insert_resource_after(delay_millis, model.node_resources, std::move(source), gate)) return;
-    }
-
-    // example inputs from some audio gizmo
-
-    {
-        const auto id = U("inputX");
-
-        const auto name = U("Gizmo Input X");
-        const auto description = U("Gizmo Input X");
-
-        // the audio gizmo is re-entrant
-        const auto source_id = impl::make_id(seed_id, nmos::types::source, impl::ports::audio, how_many);
-        const auto parent = std::pair<nmos::id, nmos::type>(source_id, nmos::types::source);
-
-        const auto channel_labels = boost::copy_range<std::vector<utility::string_t>>(boost::irange(0, input_block_size) | boost::adaptors::transformed([](const int& index)
-        {
-            return nmos::channel_symbols::Undefined(1 + index).name;
-        }));
-
-        // this input is weird, it is block-based but allows reordering of channels within a block
-        const auto reordering = true;
-        const auto block_size = 2;
-
-        auto channelmapping_input = nmos::make_channelmapping_input(id, name, description, parent, channel_labels, reordering, block_size);
-        if (!insert_resource_after(delay_millis, model.channelmapping_resources, std::move(channelmapping_input), gate)) return;
-    }
-
-    // example non-ST 2110-30 audio output
-
-    {
-        const auto id = U("outputB");
-
-        const auto name = U("AES Output B");
-        const auto description = U("AES Output B");
-
-        // non-IP audio outputs have no sourceid
-        const auto source_id = nmos::id();
-
-        const auto channel_labels = boost::copy_range<std::vector<utility::string_t>>(nmos::channel_symbols::ST | boost::adaptors::transformed([](const nmos::channel_symbol& symbol)
-        {
-            return symbol.name;
-        }));
-
-        // allow inputs from the audio gizmo
-        auto routable_inputs = std::vector<nmos::channelmapping_id>{ U("inputX") };
-        // allow unrouted channels
-        routable_inputs.push_back({});
-
-        auto channelmapping_output = nmos::make_channelmapping_output(id, name, description, source_id, channel_labels, routable_inputs);
-        if (!insert_resource_after(delay_millis, model.channelmapping_resources, std::move(channelmapping_output), gate)) return;
-    }
-
+*/
     // start background tasks to intermittently update the state of the event sources, to cause events to be emitted to connected receivers
 
     nmos::details::seed_generator events_seeder;

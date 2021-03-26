@@ -1,0 +1,14 @@
+{
+    "cmake.sourceDirectory": "${workspaceFolder}/Development",
+    "cmake.debugConfig": {
+        "args": [
+            "nodeLocalhost.json"
+        ]
+    },
+    "files.associations": {
+        "iosfwd": "cpp",
+        "*.ipp": "cpp",
+        "fstream": "cpp",
+        "sstream": "cpp"
+    }
+}
