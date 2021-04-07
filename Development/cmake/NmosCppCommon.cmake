@@ -11,7 +11,7 @@ set (SLOG_LOGGING_SEVERITY slog::max_verbosity CACHE STRING "Compile-time loggin
 
 # enable C++11
 enable_language(CXX)
-set(CMAKE_CXX_STANDARD 11 CACHE STRING "Default value for CXX_STANDARD property of targets")
+set(CMAKE_CXX_STANDARD 14 CACHE STRING "Default value for CXX_STANDARD property of targets")
 if(CMAKE_CXX_STANDARD STREQUAL "98")
     message(FATAL_ERROR "CMAKE_CXX_STANDARD must be 11 or higher; C++98 is not supported")
 endif()

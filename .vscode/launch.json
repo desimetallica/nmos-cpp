@@ -1,4 +1,5 @@
 {
+    // WARNING : This file is not useful watch settings.json
     // Use IntelliSense to learn about possible attributes.
     // Hover to view descriptions of existing attributes.
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
@@ -8,8 +9,8 @@
             "name": "(gdb) Launch",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/nmos-cpp-node",
-            "args": ["nodeLocalhost.json"],
+            "program": "${workspaceFolder}/build/nmos-cpp-receiver",
+            "args": ["../nmos-cpp-receiver/receiver.json"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],

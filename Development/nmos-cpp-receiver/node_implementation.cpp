@@ -6,6 +6,13 @@
 #include <boost/range/algorithm/find_if.hpp>
 #include <boost/range/algorithm_ext/push_back.hpp>
 #include <boost/range/irange.hpp>
+#include <boost/lexical_cast.hpp>
+
+// #include <mqtt/client.h> // paho/mqtt
+// #include <mqtt/async_client.h> // paho/mqtt
+// #include <mqtt_cpp/mqtt_client_cpp.hpp> // redboltz/mqtt
+#include "mqtt/client.h"
+
 #include "pplx/pplx_utils.h" // for pplx::complete_after, etc.
 #include "cpprest/host_utils.h"
 #ifdef HAVE_LLDP
@@ -47,7 +54,7 @@ namespace impl
     {
         const nmos::category node_implementation{ "node_implementation" };
     }
-
+    
     // custom settings for the example node implementation
     namespace fields
     {
@@ -99,12 +106,25 @@ namespace impl
         const std::vector<port> all{ video, audio, data, temperature, burn, nonsense, catcall };
     }
 
+    namespace broker
+    {
+        const std::string SERVER_ADDRESS { "tcp://10.54.131.158:1883" };
+        const std::string CLIENT_ID { "sync_publish_cpp" };
+        const std::string TOPIC { "cy-rcp-18-34/qrm9s7/camhead/status/persist/gain" };
+        const int QOS = 1;
+        const std::string PERSIST_DIR {".persist"};
+    }
+
+    //auto client_ptr = std::make_shared<mqtt::client>(broker::SERVER_ADDRESS, broker::CLIENT_ID, broker::PERSIST_DIR);
+    //mqtt::client cli(broker::SERVER_ADDRESS, broker::CLIENT_ID, broker::PERSIST_DIR);
+
     const std::vector<nmos::channel> channels_repeat{
         { U("Left Channel"), nmos::channel_symbols::L },
         { U("Right Channel"), nmos::channel_symbols::R },
         { U("Center Channel"), nmos::channel_symbols::C },
         { U("Low Frequency Effects Channel"), nmos::channel_symbols::LFE }
     };
+
 
     // generate repeatable ids for the example node's resources
     nmos::id make_id(const nmos::id& seed_id, const nmos::type& type, const port& port = {}, int index = 0);
@@ -121,6 +141,7 @@ namespace impl
     const auto temperature_Celsius = nmos::event_types::measurement(U("temperature"), U("C"));
     const auto temperature_wildcard = nmos::event_types::measurement(U("temperature"), nmos::event_types::wildcard);
     const auto catcall = nmos::event_types::named_enum(nmos::event_types::number, U("caterwaul"));
+
 }
 
 // forward declarations for node_implementation_thread
@@ -219,7 +240,7 @@ void node_implementation_thread(nmos::node_model& model, slog::base_gate& gate_)
         auto receiver_ids = impl::make_ids(seed_id, nmos::types::receiver, impl::ports::all, how_many);
         if (!insert_resource_after(delay_millis, model.node_resources, nmos::make_device(device_id, node_id, sender_ids, receiver_ids, model.settings), gate)) return;
     }
-
+/*
     // example event sources, senders, flows
     for (int index = 0; 0 <= nmos::fields::events_port(model.settings) && index < how_many; ++index)
     {
@@ -299,8 +320,8 @@ void node_implementation_thread(nmos::node_model& model, slog::base_gate& gate_)
             if (!insert_resource_after(delay_millis, model.events_resources, std::move(events_source), gate)) return;
         }
     }
-
-/*
+*/
+    
     // example event receivers
     for (int index = 0; index < how_many; ++index)
     {
@@ -342,9 +363,9 @@ void node_implementation_thread(nmos::node_model& model, slog::base_gate& gate_)
             if (!insert_resource_after(delay_millis, model.connection_resources, std::move(connection_receiver), gate)) return;
         }
     }
-*/
-    // start background tasks to intermittently update the state of the event sources, to cause events to be emitted to connected receivers
 
+    // start background tasks to intermittently update the state of the event sources, to cause events to be emitted to connected receivers
+/*
     nmos::details::seed_generator events_seeder;
     std::shared_ptr<std::default_random_engine> events_engine(new std::default_random_engine(events_seeder));
 
@@ -402,6 +423,7 @@ void node_implementation_thread(nmos::node_model& model, slog::base_gate& gate_)
         });
     }, token);
 
+
     // wait for the thread to be interrupted because the server is being shut down
     model.shutdown_condition.wait(lock, [&] { return model.shutdown; });
 
@@ -409,6 +431,8 @@ void node_implementation_thread(nmos::node_model& model, slog::base_gate& gate_)
     // wait without the lock since it is also used by the background tasks
     nmos::details::reverse_lock_guard<nmos::write_lock> unlock{ lock };
     events.wait();
+*/
+
 }
 
 // Example System API node behaviour callback to perform application-specific operations when the global configuration resource changes
@@ -572,11 +596,14 @@ nmos::events_ws_message_handler make_node_implementation_events_ws_message_handl
     const auto seed_id = nmos::experimental::fields::seed_id(model.settings);
     const auto how_many = impl::fields::how_many(model.settings);
     const auto receiver_ids = impl::make_ids(seed_id, nmos::types::receiver, impl::ports::ws, how_many);
-
+    
     // the message handler will be used for all Events WebSocket connections, and each connection may potentially
     // have subscriptions to a number of sources, for multiple receivers, so this example uses a handler adaptor
     // that enables simple processing of "state" messages (events) per receiver
-    return nmos::experimental::make_events_ws_message_handler(model, [receiver_ids, &gate](const nmos::resource& receiver, const nmos::resource& connection_receiver, const web::json::value& message)
+    return nmos::experimental::make_events_ws_message_handler(model, [receiver_ids, &gate](
+        const nmos::resource& receiver,
+        const nmos::resource& connection_receiver,
+        const web::json::value& message)
     {
         const auto found = boost::range::find(receiver_ids, connection_receiver.id);
         if (receiver_ids.end() != found)
@@ -586,6 +613,10 @@ nmos::events_ws_message_handler make_node_implementation_events_ws_message_handl
 
             if (nmos::is_matching_event_type(nmos::event_types::wildcard(nmos::event_types::number), event_type))
             {
+                // make mqtt setup
+
+                
+
                 const nmos::events_number value(nmos::fields::payload_number_value(payload).to_double(), nmos::fields::payload_number_scale(payload));
                 slog::log<slog::severities::more_info>(gate, SLOG_FLF) << nmos::stash_category(impl::categories::node_implementation) << "Event received: " << value.scaled_value() << " (" << event_type.name << ")";
             }
@@ -607,6 +638,8 @@ nmos::connection_activation_handler make_node_implementation_connection_activati
     // this example uses this callback to (un)subscribe a IS-07 Events WebSocket receiver when it is activated
     // and, in addition to the message handler, specifies the optional close handler in order that any subsequent
     // connection errors are reflected into the /active endpoint by setting master_enable to false
+    
+
     auto handle_events_ws_message = make_node_implementation_events_ws_message_handler(model, gate);
     auto handle_close = nmos::experimental::make_events_ws_close_handler(model, gate);
     auto connection_events_activation_handler = nmos::make_connection_events_websocket_activation_handler(handle_events_ws_message, handle_close, model.settings, gate);

@@ -56,6 +56,80 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
         )
 endif()
 
+# nmos-cpp-sender executable
+
+set(NMOS_CPP_NODE_SOURCES
+    ${NMOS_CPP_DIR}/nmos-cpp-sender/main.cpp
+    ${NMOS_CPP_DIR}/nmos-cpp-sender/node_implementation.cpp
+    )
+set(NMOS_CPP_NODE_HEADERS
+    ${NMOS_CPP_DIR}/nmos-cpp-sender/node_implementation.h
+    )
+
+add_executable(
+    nmos-cpp-sender
+    ${NMOS_CPP_NODE_SOURCES}
+    ${NMOS_CPP_NODE_HEADERS}
+    ${NMOS_CPP_DIR}/nmos-cpp-sender/sender.json
+    )
+
+source_group("Source Files" FILES ${NMOS_CPP_NODE_SOURCES})
+source_group("Header Files" FILES ${NMOS_CPP_NODE_HEADERS})
+
+target_link_libraries(
+    nmos-cpp-sender
+    nmos-cpp_static
+    ${CPPRESTSDK_TARGET}
+    ${PLATFORM_LIBS}
+    ${Boost_LIBRARIES}
+    )
+
+if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+    # Conan packages usually don't include PDB files so suppress the resulting warning
+    set_target_properties(
+        nmos-cpp-sender
+        PROPERTIES
+        LINK_FLAGS "/ignore:4099"
+        )
+endif()
+
+# nmos-cpp-receiver executable
+
+set(NMOS_CPP_NODE_SOURCES
+    ${NMOS_CPP_DIR}/nmos-cpp-receiver/main.cpp
+    ${NMOS_CPP_DIR}/nmos-cpp-receiver/node_implementation.cpp
+    )
+set(NMOS_CPP_NODE_HEADERS
+    ${NMOS_CPP_DIR}/nmos-cpp-receiver/node_implementation.h
+    )
+
+add_executable(
+    nmos-cpp-receiver
+    ${NMOS_CPP_NODE_SOURCES}
+    ${NMOS_CPP_NODE_HEADERS}
+    ${NMOS_CPP_DIR}/nmos-cpp-receiver/receiver.json
+    )
+
+source_group("Source Files" FILES ${NMOS_CPP_NODE_SOURCES})
+source_group("Header Files" FILES ${NMOS_CPP_NODE_HEADERS})
+
+target_link_libraries(
+    nmos-cpp-receiver
+    nmos-cpp_static
+    ${CPPRESTSDK_TARGET}
+    ${PLATFORM_LIBS}
+    ${Boost_LIBRARIES}
+    )
+
+if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+    # Conan packages usually don't include PDB files so suppress the resulting warning
+    set_target_properties(
+        nmos-cpp-sender
+        PROPERTIES
+        LINK_FLAGS "/ignore:4099"
+        )
+endif()
+
 # nmos-cpp-registry executable
 
 set(NMOS_CPP_REGISTRY_SOURCES

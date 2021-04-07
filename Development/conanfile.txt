@@ -4,6 +4,7 @@ openssl/1.1.1i
 cpprestsdk/2.10.17
 websocketpp/0.8.2
 zlib/1.2.11
+paho-mqtt-cpp/1.2.0
 
 [imports]
 bin, *.dll -> ./bin
