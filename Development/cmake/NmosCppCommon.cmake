@@ -49,6 +49,9 @@ include(safeguards)
 set (BUILD_LLDP OFF CACHE BOOL "Build LLDP support library")
 
 # find dependencies
+# pahomqttcpp
+find_package(PahoMqttCpp REQUIRED ${FIND_PACKAGE_USE_CONFIG})
+find_package(eclipse-paho-mqtt-c REQUIRED ${FIND_PACKAGE_USE_CONFIG})
 
 # cpprestsdk
 # note: 2.10.16 or higher is recommended (which is the first version with cpprestsdk-configVersion.cmake)
@@ -284,10 +287,12 @@ include_directories(
     ${OPENSSL_INCLUDE_DIR}
     ${BONJOUR_INCLUDE}
     ${PCAP_INCLUDE_DIR}
+    ${PahoMqttCpp_INCLUDE_DIR}
     )
 
 # location of libraries
 link_directories(
+    ${PahoMqttCpp_LIBRARY_DIRS}
     ${Boost_LIBRARY_DIRS}
     ${BONJOUR_LIB_DIR}
     ${PCAP_LIB_DIR}

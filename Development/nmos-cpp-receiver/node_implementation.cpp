@@ -7,11 +7,9 @@
 #include <boost/range/algorithm_ext/push_back.hpp>
 #include <boost/range/irange.hpp>
 #include <boost/lexical_cast.hpp>
-
-// #include <mqtt/client.h> // paho/mqtt
-// #include <mqtt/async_client.h> // paho/mqtt
-// #include <mqtt_cpp/mqtt_client_cpp.hpp> // redboltz/mqtt
-#include "mqtt/client.h"
+#include <mqtt/client.h> // paho/mqtt
+// #include <mqtt_client_cpp.hpp> // redboltz/mqtt
+//#include "mqtt/async_client.h"
 
 #include "pplx/pplx_utils.h" // for pplx::complete_after, etc.
 #include "cpprest/host_utils.h"
@@ -112,11 +110,12 @@ namespace impl
         const std::string CLIENT_ID { "sync_publish_cpp" };
         const std::string TOPIC { "cy-rcp-18-34/qrm9s7/camhead/status/persist/gain" };
         const int QOS = 1;
-        const std::string PERSIST_DIR {".persist"};
+        const std::string PERSIST_DIR {"./persist"};
     }
 
     //auto client_ptr = std::make_shared<mqtt::client>(broker::SERVER_ADDRESS, broker::CLIENT_ID, broker::PERSIST_DIR);
-    //mqtt::client cli(broker::SERVER_ADDRESS, broker::CLIENT_ID, broker::PERSIST_DIR);
+    //mqtt::async_client client(broker::SERVER_ADDRESS, broker::CLIENT_ID);
+    mqtt::client client(broker::SERVER_ADDRESS, broker::CLIENT_ID);
 
     const std::vector<nmos::channel> channels_repeat{
         { U("Left Channel"), nmos::channel_symbols::L },

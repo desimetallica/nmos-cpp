@@ -851,77 +851,78 @@ set(NMOS_CPP_NMOS_HEADERS
     ${NMOS_CPP_DIR}/nmos/vpid_code.h
     ${NMOS_CPP_DIR}/nmos/websockets.h
     )
-
+#[[
 set(NMOS_CPP_MQTT_HEADERS
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt_client_cpp.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/any.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/async_client.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/attributes.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/buffer.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/callable_overlay.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/client.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/config.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/connect_flags.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/connect_return_code.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/constant.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/const_buffer_util.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/control_packet_type.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/deprecated.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/deprecated_msg.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/endpoint.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/error_code.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/exception.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/fixed_header.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/four_byte_util.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/hexdump.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/log.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/message.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/message_variant.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/move.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/namespace.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/null_strand.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/optional.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/packet_id_manager.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/packet_id_type.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/property.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/property_id.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/property_parse.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/property_variant.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/protocol_version.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/publish.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/reason_code.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/remaining_length.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/server.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/session_present.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/setup_log.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/shared_any.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/shared_ptr_array.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/shared_scope_guard.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/shared_subscriptions.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/string_check.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/string_view.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/subscribe_entry.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/subscribe_options.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/sync_client.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/tcp_endpoint.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/time_point_t.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/tls.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/topic_alias_recv.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/topic_alias_send.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/two_byte_util.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/two_or_four_byte_util.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/type_erased_socket.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/type.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/utf8encoded_strings.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/v5_message.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/value_allocator.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/variable_length.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/variant.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/variant_visit.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/visitor_util.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/will.hpp
-    ${NMOS_CPP_DIR}/mqtt_cpp/mqtt/ws_endpoint.hpp
+    ${NMOS_CPP_DIR}/mqtt_client_cpp.hpp
+    ${NMOS_CPP_DIR}/mqtt/any.hpp
+    ${NMOS_CPP_DIR}/mqtt/async_client.hpp
+    ${NMOS_CPP_DIR}/mqtt/attributes.hpp
+    ${NMOS_CPP_DIR}/mqtt/buffer.hpp
+    ${NMOS_CPP_DIR}/mqtt/callable_overlay.hpp
+    ${NMOS_CPP_DIR}/mqtt/client.hpp
+    ${NMOS_CPP_DIR}/mqtt/config.hpp
+    ${NMOS_CPP_DIR}/mqtt/connect_flags.hpp
+    ${NMOS_CPP_DIR}/mqtt/connect_return_code.hpp
+    ${NMOS_CPP_DIR}/mqtt/constant.hpp
+    ${NMOS_CPP_DIR}/mqtt/const_buffer_util.hpp
+    ${NMOS_CPP_DIR}/mqtt/control_packet_type.hpp
+    ${NMOS_CPP_DIR}/mqtt/deprecated.hpp
+    ${NMOS_CPP_DIR}/mqtt/deprecated_msg.hpp
+    ${NMOS_CPP_DIR}/mqtt/endpoint.hpp
+    ${NMOS_CPP_DIR}/mqtt/error_code.hpp
+    ${NMOS_CPP_DIR}/mqtt/exception.hpp
+    ${NMOS_CPP_DIR}/mqtt/fixed_header.hpp
+    ${NMOS_CPP_DIR}/mqtt/four_byte_util.hpp
+    ${NMOS_CPP_DIR}/mqtt/hexdump.hpp
+    ${NMOS_CPP_DIR}/mqtt/log.hpp
+    ${NMOS_CPP_DIR}/mqtt/message.hpp
+    ${NMOS_CPP_DIR}/mqtt/message_variant.hpp
+    ${NMOS_CPP_DIR}/mqtt/move.hpp
+    ${NMOS_CPP_DIR}/mqtt/namespace.hpp
+    ${NMOS_CPP_DIR}/mqtt/null_strand.hpp
+    ${NMOS_CPP_DIR}/mqtt/optional.hpp
+    ${NMOS_CPP_DIR}/mqtt/packet_id_manager.hpp
+    ${NMOS_CPP_DIR}/mqtt/packet_id_type.hpp
+    ${NMOS_CPP_DIR}/mqtt/property.hpp
+    ${NMOS_CPP_DIR}/mqtt/property_id.hpp
+    ${NMOS_CPP_DIR}/mqtt/property_parse.hpp
+    ${NMOS_CPP_DIR}/mqtt/property_variant.hpp
+    ${NMOS_CPP_DIR}/mqtt/protocol_version.hpp
+    ${NMOS_CPP_DIR}/mqtt/publish.hpp
+    ${NMOS_CPP_DIR}/mqtt/reason_code.hpp
+    ${NMOS_CPP_DIR}/mqtt/remaining_length.hpp
+    ${NMOS_CPP_DIR}/mqtt/server.hpp
+    ${NMOS_CPP_DIR}/mqtt/session_present.hpp
+    ${NMOS_CPP_DIR}/mqtt/setup_log.hpp
+    ${NMOS_CPP_DIR}/mqtt/shared_any.hpp
+    ${NMOS_CPP_DIR}/mqtt/shared_ptr_array.hpp
+    ${NMOS_CPP_DIR}/mqtt/shared_scope_guard.hpp
+    ${NMOS_CPP_DIR}/mqtt/shared_subscriptions.hpp
+    ${NMOS_CPP_DIR}/mqtt/string_check.hpp
+    ${NMOS_CPP_DIR}/mqtt/string_view.hpp
+    ${NMOS_CPP_DIR}/mqtt/subscribe_entry.hpp
+    ${NMOS_CPP_DIR}/mqtt/subscribe_options.hpp
+    ${NMOS_CPP_DIR}/mqtt/sync_client.hpp
+    ${NMOS_CPP_DIR}/mqtt/tcp_endpoint.hpp
+    ${NMOS_CPP_DIR}/mqtt/time_point_t.hpp
+    ${NMOS_CPP_DIR}/mqtt/tls.hpp
+    ${NMOS_CPP_DIR}/mqtt/topic_alias_recv.hpp
+    ${NMOS_CPP_DIR}/mqtt/topic_alias_send.hpp
+    ${NMOS_CPP_DIR}/mqtt/two_byte_util.hpp
+    ${NMOS_CPP_DIR}/mqtt/two_or_four_byte_util.hpp
+    ${NMOS_CPP_DIR}/mqtt/type_erased_socket.hpp
+    ${NMOS_CPP_DIR}/mqtt/type.hpp
+    ${NMOS_CPP_DIR}/mqtt/utf8encoded_strings.hpp
+    ${NMOS_CPP_DIR}/mqtt/v5_message.hpp
+    ${NMOS_CPP_DIR}/mqtt/value_allocator.hpp
+    ${NMOS_CPP_DIR}/mqtt/variable_length.hpp
+    ${NMOS_CPP_DIR}/mqtt/variant.hpp
+    ${NMOS_CPP_DIR}/mqtt/variant_visit.hpp
+    ${NMOS_CPP_DIR}/mqtt/visitor_util.hpp
+    ${NMOS_CPP_DIR}/mqtt/will.hpp
+    ${NMOS_CPP_DIR}/mqtt/ws_endpoint.hpp
     )
+]]
 
 set(NMOS_CPP_PPLX_SOURCES
     ${NMOS_CPP_DIR}/pplx/pplx_utils.cpp
@@ -975,15 +976,14 @@ source_group("nmos\\Source Files" FILES ${NMOS_CPP_NMOS_SOURCES})
 source_group("pplx\\Source Files" FILES ${NMOS_CPP_PPLX_SOURCES})
 source_group("rql\\Source Files" FILES ${NMOS_CPP_RQL_SOURCES})
 source_group("sdp\\Source Files" FILES ${NMOS_CPP_SDP_SOURCES})
-
 source_group("bst\\Header Files" FILES ${NMOS_CPP_BST_HEADERS})
 source_group("cpprest\\Header Files" FILES ${NMOS_CPP_CPPREST_HEADERS})
 source_group("nmos\\Header Files" FILES ${NMOS_CPP_NMOS_HEADERS})
-source_group("mqtt_cpp\\Header Files" FILES ${NMOS_CPP_MQTT_HEADERS})
 source_group("pplx\\Header Files" FILES ${NMOS_CPP_PPLX_HEADERS})
 source_group("rql\\Header Files" FILES ${NMOS_CPP_RQL_HEADERS})
 source_group("sdp\\Header Files" FILES ${NMOS_CPP_SDP_HEADERS})
 source_group("slog\\Header Files" FILES ${NMOS_CPP_SLOG_HEADERS})
+#source_group("mqtt\\Header Files" FILES ${NMOS_CPP_MQTT_HEADERS})
 
 target_link_libraries(
     nmos-cpp_static
@@ -1011,8 +1011,8 @@ install(FILES ${NMOS_CPP_BST_HEADERS} DESTINATION include${NMOS_CPP_INCLUDE_PREF
 install(FILES ${NMOS_CPP_CPPREST_HEADERS} DESTINATION include${NMOS_CPP_INCLUDE_PREFIX}/cpprest)
 install(FILES ${NMOS_CPP_CPPREST_DETAILS_HEADERS} DESTINATION include${NMOS_CPP_INCLUDE_PREFIX}/cpprest/details)
 install(FILES ${NMOS_CPP_NMOS_HEADERS} DESTINATION include${NMOS_CPP_INCLUDE_PREFIX}/nmos)
-install(FILES ${NMOS_CPP_MQTT_HEADERS} DESTINATION include${NMOS_CPP_INCLUDE_PREFIX}/mqtt_cpp)
 install(FILES ${NMOS_CPP_PPLX_HEADERS} DESTINATION include${NMOS_CPP_INCLUDE_PREFIX}/pplx)
 install(FILES ${NMOS_CPP_RQL_HEADERS} DESTINATION include${NMOS_CPP_INCLUDE_PREFIX}/rql)
 install(FILES ${NMOS_CPP_SDP_HEADERS} DESTINATION include${NMOS_CPP_INCLUDE_PREFIX}/sdp)
 install(FILES ${NMOS_CPP_SLOG_HEADERS} DESTINATION include${NMOS_CPP_INCLUDE_PREFIX}/slog)
+#install(FILES ${NMOS_CPP_MQTT_HEADERS} DESTINATION include${NMOS_CPP_INCLUDE_PREFIX}/mqtt)

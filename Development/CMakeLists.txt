@@ -119,6 +119,7 @@ target_link_libraries(
     ${CPPRESTSDK_TARGET}
     ${PLATFORM_LIBS}
     ${Boost_LIBRARIES}
+    ${PahoMqttCpp_LIBRARIES}
     )
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
