@@ -7,9 +7,9 @@
 #include <boost/range/algorithm_ext/push_back.hpp>
 #include <boost/range/irange.hpp>
 #include <boost/lexical_cast.hpp>
-#include <mqtt/client.h> // paho/mqtt
+// #include <mqtt/client.h> // paho/mqtt
 // #include <mqtt_client_cpp.hpp> // redboltz/mqtt
-//#include "mqtt/async_client.h"
+#include "mqtt/async_client.h"
 
 #include "pplx/pplx_utils.h" // for pplx::complete_after, etc.
 #include "cpprest/host_utils.h"
@@ -111,11 +111,9 @@ namespace impl
         const std::string TOPIC { "cy-rcp-18-34/qrm9s7/camhead/status/persist/gain" };
         const int QOS = 1;
         const std::string PERSIST_DIR {"./persist"};
+        const long TIMEOUT = 20;
+        const int KEEPALIVE = 10;
     }
-
-    //auto client_ptr = std::make_shared<mqtt::client>(broker::SERVER_ADDRESS, broker::CLIENT_ID, broker::PERSIST_DIR);
-    //mqtt::async_client client(broker::SERVER_ADDRESS, broker::CLIENT_ID);
-    mqtt::client client(broker::SERVER_ADDRESS, broker::CLIENT_ID);
 
     const std::vector<nmos::channel> channels_repeat{
         { U("Left Channel"), nmos::channel_symbols::L },
@@ -362,76 +360,6 @@ void node_implementation_thread(nmos::node_model& model, slog::base_gate& gate_)
             if (!insert_resource_after(delay_millis, model.connection_resources, std::move(connection_receiver), gate)) return;
         }
     }
-
-    // start background tasks to intermittently update the state of the event sources, to cause events to be emitted to connected receivers
-/*
-    nmos::details::seed_generator events_seeder;
-    std::shared_ptr<std::default_random_engine> events_engine(new std::default_random_engine(events_seeder));
-
-    auto cancellation_source = pplx::cancellation_token_source();
-    auto token = cancellation_source.get_token();
-    auto events = pplx::do_while([&model, seed_id, how_many, events_engine, &gate, token]
-    {
-        const auto event_interval = std::uniform_real_distribution<>(0.5, 5.0)(*events_engine);
-        return pplx::complete_after(std::chrono::milliseconds(std::chrono::milliseconds::rep(1000 * event_interval)), token).then([&model, seed_id, how_many, events_engine, &gate]
-        {
-            auto lock = model.write_lock();
-
-            // make example temperature data ... \/\/\/\/ ... around 200
-            const nmos::events_number temp(175.0 + std::abs(nmos::tai_now().seconds % 100 - 50), 10);
-            // i.e. 17.5-22.5 C
-
-            for (int index = 0; index < how_many; ++index)
-            {
-                for (const auto& port : impl::ports::ws)
-                {
-                    const auto source_id = impl::make_id(seed_id, nmos::types::source, port, index);
-                    const auto flow_id = impl::make_id(seed_id, nmos::types::flow, port, index);
-
-                    modify_resource(model.events_resources, source_id, [&](nmos::resource& resource)
-                    {
-                        if (impl::ports::temperature == port)
-                        {
-                            nmos::fields::endpoint_state(resource.data) = nmos::make_events_number_state({ source_id, flow_id }, temp, impl::temperature_Celsius);
-                        }
-                        else if (impl::ports::burn == port)
-                        {
-                            nmos::fields::endpoint_state(resource.data) = nmos::make_events_boolean_state({ source_id, flow_id }, temp.scaled_value() > 20.0);
-                        }
-                        else if (impl::ports::nonsense == port)
-                        {
-                            const auto nonsenses = { U("foo"), U("bar"), U("baz"), U("qux"), U("quux"), U("quuux") };
-                            const auto& nonsense = *(nonsenses.begin() + (std::min)(std::geometric_distribution<size_t>()(*events_engine), nonsenses.size() - 1));
-                            nmos::fields::endpoint_state(resource.data) = nmos::make_events_string_state({ source_id, flow_id }, nonsense);
-                        }
-                        else if (impl::ports::catcall == port)
-                        {
-                            const auto catcalls = { 1, 2, 4, 8 };
-                            const auto& catcall = *(catcalls.begin() + (std::min)(std::geometric_distribution<size_t>()(*events_engine), catcalls.size() - 1));
-                            nmos::fields::endpoint_state(resource.data) = nmos::make_events_number_state({ source_id, flow_id }, catcall, impl::catcall);
-                        }
-                    });
-                }
-            }
-
-            slog::log<slog::severities::more_info>(gate, SLOG_FLF) << "Temperature updated: " << temp.scaled_value() << " (" << impl::temperature_Celsius.name << ")";
-
-            model.notify();
-
-            return true;
-        });
-    }, token);
-
-
-    // wait for the thread to be interrupted because the server is being shut down
-    model.shutdown_condition.wait(lock, [&] { return model.shutdown; });
-
-    cancellation_source.cancel();
-    // wait without the lock since it is also used by the background tasks
-    nmos::details::reverse_lock_guard<nmos::write_lock> unlock{ lock };
-    events.wait();
-*/
-
 }
 
 // Example System API node behaviour callback to perform application-specific operations when the global configuration resource changes
@@ -612,12 +540,25 @@ nmos::events_ws_message_handler make_node_implementation_events_ws_message_handl
 
             if (nmos::is_matching_event_type(nmos::event_types::wildcard(nmos::event_types::number), event_type))
             {
-                // make mqtt setup
-
+                // here mqtt post to server
                 
+                mqtt::connect_options connOpts;
+                connOpts.set_keep_alive_interval(impl::broker::KEEPALIVE);
+                connOpts.set_clean_session(true);
+                connOpts.set_connect_timeout(impl::broker::TIMEOUT);
 
+                mqtt::async_client client(impl::broker::SERVER_ADDRESS, impl::broker::CLIENT_ID, impl::broker::PERSIST_DIR);
+
+                mqtt::token_ptr conntok = client.connect(connOpts);
+                conntok->wait();
+  
                 const nmos::events_number value(nmos::fields::payload_number_value(payload).to_double(), nmos::fields::payload_number_scale(payload));
                 slog::log<slog::severities::more_info>(gate, SLOG_FLF) << nmos::stash_category(impl::categories::node_implementation) << "Event received: " << value.scaled_value() << " (" << event_type.name << ")";
+                // First use a message pointer.
+                mqtt::message_ptr pubmsg = mqtt::make_message(impl::broker::TOPIC, boost::lexical_cast<std::string>(value.scaled_value()));
+                pubmsg->set_qos(impl::broker::QOS);
+                client.publish(pubmsg)->wait_for(impl::broker::TIMEOUT);
+                slog::log<slog::severities::more_info>(gate, SLOG_FLF) << nmos::stash_category(impl::categories::node_implementation) << "Event published on MQTT: " << value.scaled_value() << " (" << event_type.name << ")";
             }
             else if (nmos::is_matching_event_type(nmos::event_types::wildcard(nmos::event_types::string), event_type))
             {

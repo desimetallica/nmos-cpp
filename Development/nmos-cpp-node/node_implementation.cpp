@@ -300,7 +300,7 @@ void node_implementation_thread(nmos::node_model& model, slog::base_gate& gate_)
         }
     }
 
-/*
+
     // example event receivers
     for (int index = 0; index < how_many; ++index)
     {
@@ -342,7 +342,7 @@ void node_implementation_thread(nmos::node_model& model, slog::base_gate& gate_)
             if (!insert_resource_after(delay_millis, model.connection_resources, std::move(connection_receiver), gate)) return;
         }
     }
-*/
+
     // start background tasks to intermittently update the state of the event sources, to cause events to be emitted to connected receivers
 
     nmos::details::seed_generator events_seeder;

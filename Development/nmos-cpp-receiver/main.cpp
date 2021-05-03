@@ -6,10 +6,39 @@
 #include "nmos/process_utils.h"
 #include "nmos/server.h"
 #include "node_implementation.h"
+// #include <mqtt/client.h> // paho/mqtt
+// #include "MQTTClient.h"
+// #include "mqtt/async_client.h"
 
 int main(int argc, char* argv[])
 {
-    // Construct our data models including mutexes to protect them
+
+    // ----------------------------------------------- MQTT
+    // const char* PERSIST_DIR {"./persist"};
+    // const long TIMEOUT = 20;
+    // const int KEEPALIVE = 10;
+
+    // const std::string SERVER_ADDRESS("tcp://10.54.131.158:1883");
+    // const std::string CLIENT_ID("eclipse_subcriber");
+    // const std::string TOPIC("topic1");
+    // const std::string PAYLOAD1("top");
+    // const int	QOS = 1;
+ 
+    // mqtt::connect_options connOpts;
+	// connOpts.set_keep_alive_interval(KEEPALIVE);
+	// connOpts.set_clean_session(true);
+    // connOpts.set_connect_timeout(TIMEOUT);
+
+    // mqtt::async_client client(SERVER_ADDRESS, CLIENT_ID, PERSIST_DIR);
+
+    // mqtt::token_ptr conntok = client.connect(connOpts);
+    // conntok->wait();
+
+    // // First use a message pointer.
+    // mqtt::message_ptr pubmsg = mqtt::make_message(TOPIC, PAYLOAD1);
+    // pubmsg->set_qos(QOS);
+    // client.publish(pubmsg)->wait_for(TIMEOUT);
+    // ----------------------------------------------- MQTT
 
     nmos::node_model node_model;
 
