@@ -7,8 +7,6 @@
 #include <boost/range/algorithm_ext/push_back.hpp>
 #include <boost/range/irange.hpp>
 #include <boost/lexical_cast.hpp>
-// #include <mqtt/client.h> // paho/mqtt
-// #include <mqtt_client_cpp.hpp> // redboltz/mqtt
 #include "mqtt/async_client.h"
 
 #include "pplx/pplx_utils.h" // for pplx::complete_after, etc.
@@ -106,13 +104,16 @@ namespace impl
 
     namespace broker
     {
-        const std::string SERVER_ADDRESS { "tcp://10.54.131.158:1883" };
-        const std::string CLIENT_ID { "sync_publish_cpp" };
+        // destination parameter for cyanview where to move?
         const std::string TOPIC { "cy-rcp-18-34/qrm9s7/camhead/status/persist/gain" };
+        
+        //move into json
         const int QOS = 1;
         const std::string PERSIST_DIR {"./persist"};
-        const long TIMEOUT = 20;
+        const long TIMEOUT = 200;
         const int KEEPALIVE = 10;
+        const std::string SERVER_ADDRESS { "tcp://10.54.131.158:1883" };
+        const std::string CLIENT_ID { "sync_publish_cpp" };
     }
 
     const std::vector<nmos::channel> channels_repeat{
@@ -554,11 +555,16 @@ nmos::events_ws_message_handler make_node_implementation_events_ws_message_handl
   
                 const nmos::events_number value(nmos::fields::payload_number_value(payload).to_double(), nmos::fields::payload_number_scale(payload));
                 slog::log<slog::severities::more_info>(gate, SLOG_FLF) << nmos::stash_category(impl::categories::node_implementation) << "Event received: " << value.scaled_value() << " (" << event_type.name << ")";
-                // First use a message pointer.
+                
                 mqtt::message_ptr pubmsg = mqtt::make_message(impl::broker::TOPIC, boost::lexical_cast<std::string>(value.scaled_value()));
                 pubmsg->set_qos(impl::broker::QOS);
+                
                 client.publish(pubmsg)->wait_for(impl::broker::TIMEOUT);
                 slog::log<slog::severities::more_info>(gate, SLOG_FLF) << nmos::stash_category(impl::categories::node_implementation) << "Event published on MQTT: " << value.scaled_value() << " (" << event_type.name << ")";
+                
+                client.disconnect(impl::broker::TIMEOUT)->wait();
+                slog::log<slog::severities::more_info>(gate, SLOG_FLF) << nmos::stash_category(impl::categories::node_implementation) << "MQTT client disconnected";
+                
             }
             else if (nmos::is_matching_event_type(nmos::event_types::wildcard(nmos::event_types::string), event_type))
             {
