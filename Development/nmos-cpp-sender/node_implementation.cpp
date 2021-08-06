@@ -8,6 +8,8 @@
 #include <boost/range/irange.hpp>
 #include "pplx/pplx_utils.h" // for pplx::complete_after, etc.
 #include "cpprest/host_utils.h"
+#include "cpprest/http_listener.h"
+
 #ifdef HAVE_LLDP
 #include "lldp/lldp_manager.h"
 #endif
@@ -42,6 +44,8 @@
 // example node implementation details
 namespace impl
 {
+     web::http::experimental::listener::http_listener control_listener();
+
     // custom logging category for the example node implementation thread
     namespace categories
     {
@@ -126,6 +130,67 @@ namespace impl
 // forward declarations for node_implementation_thread
 nmos::connection_resource_auto_resolver make_node_implementation_auto_resolver(const nmos::settings& settings);
 nmos::connection_sender_transportfile_setter make_node_implementation_transportfile_setter(const nmos::resources& node_resources, const nmos::settings& settings);
+
+
+// HTTP API CONTROL ADD
+// Shoult it return web::http::experimental::listener::api_router ? For better implementation
+web::http::experimental::listener::api_router make_control_api(nmos::node_model& model, slog::base_gate& gate, nmos::id source_id, nmos::id flow_id )
+{
+    using namespace web::http::experimental::listener::api_router_using_declarations;
+
+    api_router control_api;
+
+    control_api.support(U("/test/?"), methods::GET, [source_id, flow_id, &gate, &model](http_request req, http_response res, const string_t&, const route_parameters&)
+    {
+        slog::log<slog::severities::more_info>(gate, SLOG_FLF) << "Controlling Method invoked";
+        
+        auto lock = model.write_lock();
+        const nmos::events_number temp(175.0 + std::abs(nmos::tai_now().seconds % 100 - 50), 10);
+        modify_resource(model.events_resources, source_id, [&](nmos::resource& resource)
+        {
+            nmos::fields::endpoint_state(resource.data) = nmos::make_events_number_state({ source_id, flow_id }, temp, impl::temperature_Celsius);
+        });
+
+        
+        slog::log<slog::severities::more_info>(gate, SLOG_FLF) << "CONTROL temperature updated: " << temp.scaled_value() << " (" << impl::temperature_Celsius.name << ")";
+        
+        //not sure if needed
+        //model.notify();
+        
+        set_reply(res, status_codes::OK, U("ciao"));
+        return pplx::task_from_result(true);
+    });
+    
+    return control_api;
+}
+
+void changeTemperature(web::http::http_request req, nmos::node_model& model, slog::base_gate& gate, nmos::id source_id, nmos::id flow_id){
+    using namespace web::http::experimental::listener::api_router_using_declarations;
+
+    slog::log<slog::severities::more_info>(gate, SLOG_FLF) << "Controlling Method invoked";
+    
+    auto lock = model.write_lock();
+    const nmos::events_number temp(175.0 + std::abs(nmos::tai_now().seconds % 100 - 50), 10);
+    modify_resource(model.events_resources, source_id, [&](nmos::resource& resource)
+    {
+        nmos::fields::endpoint_state(resource.data) = nmos::make_events_number_state({ source_id, flow_id }, temp, impl::temperature_Celsius);
+    });
+
+    
+    slog::log<slog::severities::more_info>(gate, SLOG_FLF) << "CONTROL temperature updated: " << temp.scaled_value() << " (" << impl::temperature_Celsius.name << ")";
+    
+    //not sure if needed
+    //model.notify();
+    req.reply(status_codes::OK, U("CIAO")); 
+    //set_reply(status_codes::OK, U("ciao"));
+}
+
+void handleGet(web::http::http_request req){
+    using namespace web::http::experimental::listener::api_router_using_declarations;
+    req.reply(status_codes::OK, U("CIAO"));
+    return pplx::task_from_result(true);
+}
+
 
 // This is an example of how to integrate the nmos-cpp library with a device-specific underlying implementation.
 // It constructs and inserts a node resource and some sub-resources into the model, based on the model settings,
@@ -346,6 +411,100 @@ void node_implementation_thread(nmos::node_model& model, slog::base_gate& gate_)
     // start background tasks to intermittently update the state of the event sources, to cause events to be emitted to connected receivers
 
     nmos::details::seed_generator events_seeder;
+    // just for random values
+    std::shared_ptr<std::default_random_engine> events_engine(new std::default_random_engine(events_seeder));
+    for (int index = 0; index < how_many; ++index)
+    {
+        //web::http::experimental::listener::api_router control_router;
+        nmos::id source_id;
+        nmos::id flow_id;
+        for (const auto& port : impl::ports::ws)
+        {
+            source_id = impl::make_id(seed_id, nmos::types::source, port, index);
+            flow_id = impl::make_id(seed_id, nmos::types::flow, port, index);
+            //control_router = make_control_api(model, gate, source_id, flow_id );
+        }
+        
+        //web::http::experimental::listener::http_listener api_listener(web::http::experimental::listener::make_listener_uri(0, "0.0.0.0", 9999));
+        auto url = web::http::uri("http://127.0.0.1:9999");
+        web::http::experimental::listener::http_listener api_listener(url);
+        api_listener.support(web::http::methods::GET, handleGet);
+        pplx::create_task([&api_listener, &gate]
+        {
+            api_listener
+            .open()
+            .then([&api_listener, &gate]() {slog::log<slog::severities::more_info>(gate, SLOG_FLF) << "Open control listener 0.0.0.0:9999: " << api_listener.uri().to_string(); })
+            .wait();
+        });
+        
+        // try {
+            
+        // } catch (std::exception const& e)
+        // {
+        //     slog::log<slog::severities::more_info>(gate, SLOG_FLF) << "Exception in building http_listerner: " << e.what() << " (" << impl::temperature_Celsius.name << ")";
+        // }
+    }
+
+    /*
+    auto cancellation_source = pplx::cancellation_token_source();
+    auto token = cancellation_source.get_token();
+    auto events = pplx::do_while([&model, seed_id, how_many, events_engine, &gate, token]
+    {
+        const auto event_interval = std::uniform_real_distribution<>(0.5, 5.0)(*events_engine);
+        return pplx::complete_after(std::chrono::milliseconds(std::chrono::milliseconds::rep(1000 * event_interval)), token).then([&model, seed_id, how_many, events_engine, &gate]
+        {
+            auto lock = model.write_lock();
+
+            // make example temperature data ... \/\/\/\/ ... around 200
+            const nmos::events_number temp(175.0 + std::abs(nmos::tai_now().seconds % 100 - 50), 10);
+            // i.e. 17.5-22.5 C
+            
+
+            for (int index = 0; index < how_many; ++index)
+            {
+                for (const auto& port : impl::ports::ws)
+                {
+                    const auto source_id = impl::make_id(seed_id, nmos::types::source, port, index);
+                    const auto flow_id = impl::make_id(seed_id, nmos::types::flow, port, index);
+
+                    modify_resource(model.events_resources, source_id, [&](nmos::resource& resource)
+                    {
+                        if (impl::ports::temperature == port)
+                        {
+                            nmos::fields::endpoint_state(resource.data) = nmos::make_events_number_state({ source_id, flow_id }, temp, impl::temperature_Celsius);
+                        }
+                        else if (impl::ports::burn == port)
+                        {
+                            nmos::fields::endpoint_state(resource.data) = nmos::make_events_boolean_state({ source_id, flow_id }, temp.scaled_value() > 20.0);
+                        }
+                        else if (impl::ports::nonsense == port)
+                        {
+                            const auto nonsenses = { U("foo"), U("bar"), U("baz"), U("qux"), U("quux"), U("quuux") };
+                            const auto& nonsense = *(nonsenses.begin() + (std::min)(std::geometric_distribution<size_t>()(*events_engine), nonsenses.size() - 1));
+                            nmos::fields::endpoint_state(resource.data) = nmos::make_events_string_state({ source_id, flow_id }, nonsense);
+                        }
+                        else if (impl::ports::catcall == port)
+                        {
+                            const auto catcalls = { 1, 2, 4, 8 };
+                            const auto& catcall = *(catcalls.begin() + (std::min)(std::geometric_distribution<size_t>()(*events_engine), catcalls.size() - 1));
+                            nmos::fields::endpoint_state(resource.data) = nmos::make_events_number_state({ source_id, flow_id }, catcall, impl::catcall);
+                        }
+                    });
+                }
+            }
+
+            slog::log<slog::severities::more_info>(gate, SLOG_FLF) << "Temperature updated: " << temp.scaled_value() << " (" << impl::temperature_Celsius.name << ")";
+
+            model.notify();
+
+            return true;
+        });
+    }, token);
+    */
+
+    /*  
+    // start background tasks to intermittently update the state of the event sources, to cause events to be emitted to connected receivers
+    nmos::details::seed_generator events_seeder;
     std::shared_ptr<std::default_random_engine> events_engine(new std::default_random_engine(events_seeder));
 
     auto cancellation_source = pplx::cancellation_token_source();
@@ -401,7 +560,9 @@ void node_implementation_thread(nmos::node_model& model, slog::base_gate& gate_)
             return true;
         });
     }, token);
-
+    */
+   
+   /*
     // wait for the thread to be interrupted because the server is being shut down
     model.shutdown_condition.wait(lock, [&] { return model.shutdown; });
 
@@ -409,6 +570,7 @@ void node_implementation_thread(nmos::node_model& model, slog::base_gate& gate_)
     // wait without the lock since it is also used by the background tasks
     nmos::details::reverse_lock_guard<nmos::write_lock> unlock{ lock };
     events.wait();
+    */
 }
 
 // Example System API node behaviour callback to perform application-specific operations when the global configuration resource changes

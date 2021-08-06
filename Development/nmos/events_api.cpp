@@ -28,6 +28,12 @@ namespace nmos
             return pplx::task_from_result(true);
         });
 
+        // events_api.support(U("/test/?"), methods::GET, [](http_request req, http_response res, const string_t&, const route_parameters&)
+        // {
+        //     set_reply(res, status_codes::OK, U("ciao"));
+        //     return pplx::task_from_result(true);
+        // });
+
         const auto versions = with_read_lock(model.mutex, [&model] { return nmos::is07_versions::from_settings(model.settings); });
         events_api.support(U("/x-nmos/") + nmos::patterns::events_api.pattern + U("/?"), methods::GET, [versions](http_request req, http_response res, const string_t&, const route_parameters&)
         {
