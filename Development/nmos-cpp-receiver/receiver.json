@@ -1,0 +1,15 @@
+{
+    "logging_level": -20,
+    "http_port": 8080,
+    "domain": "local",
+    "label": "sony-nmos-receiver",
+    "host_name": "sony-nmos-receiver",
+    "how_many": 1,
+    "events_ws_port": 8081,
+    "registry_address": "172.17.0.4",
+    "registry_version": "v1.3",
+    "registration_port": 8080,
+    "system_port": 8080,
+    "system_address": "172.17.0.4",
+    "system_version": "v1.1"
+}
