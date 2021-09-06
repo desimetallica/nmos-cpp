@@ -1,0 +1,34 @@
+FROM mcr.microsoft.com/vscode/devcontainers/cpp:0-ubuntu-20.04
+
+MAINTAINER Davide Desirello <davide.desirello@rai.it>
+
+RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
+     && apt-get -y install python3-pip \
+     libavahi-compat-libdnssd-dev \
+     python3-setuptools \
+     build-essential \
+     libssl-dev
+
+RUN pip3 install conan
+
+RUN cd /tmp && wget https://github.com/Kitware/CMake/releases/download/v3.20.0/cmake-3.20.0.tar.gz && tar -zxvf cmake-3.20.0.tar.gz
+
+RUN cd /tmp/cmake-3.20.0 && ./bootstrap && make -j `nproc` && sudo make install
+
+RUN ldconfig
+
+#RUN sudo ln -s /home/vscode/.local/bin/conan /usr/local/bin/conan
+
+#note use context ./nmos-cpp directory
+
+COPY . /workspace/nmos-cpp
+
+WORKDIR /workspace/nmos-cpp/build
+
+RUN rm /workspace/nmos-cpp/build/CMakeCache.txt
+
+RUN cmake ../Development -DCMAKE_BUILD_TYPE:STRING="debug"
+
+RUN make -j `nproc`
+
+ENTRYPOINT /workspace/nmos-cpp/build/nmos-cpp-receiver node.json

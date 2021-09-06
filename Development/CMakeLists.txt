@@ -32,6 +32,9 @@ if(NMOS_CPP_BUILD_EXAMPLES)
 
     # nmos-cpp-receiver executable
     include(cmake/NmosCppReceiver.cmake)
+
+    # nmos-cpp-receiver executable
+    include(cmake/NmosCppSender.cmake)
 endif()
 
 if(NMOS_CPP_BUILD_TESTS)
