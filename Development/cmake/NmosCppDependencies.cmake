@@ -123,6 +123,10 @@ add_library(nmos-cpp::cpprestsdk ALIAS cpprestsdk)
 
 # websocketpp
 
+# pahomqttcpp
+find_package(PahoMqttCpp REQUIRED ${FIND_PACKAGE_USE_CONFIG})
+find_package(eclipse-paho-mqtt-c REQUIRED ${FIND_PACKAGE_USE_CONFIG})
+
 # note: good idea to use same version as cpprestsdk was built with!
 if(DEFINED WEBSOCKETPP_INCLUDE_DIR)
     message(STATUS "Using configured websocketpp include directory at " ${WEBSOCKETPP_INCLUDE_DIR})

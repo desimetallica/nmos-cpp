@@ -29,6 +29,9 @@ if(NMOS_CPP_BUILD_EXAMPLES)
 
     # nmos-cpp-registry executable
     include(cmake/NmosCppRegistry.cmake)
+
+    # nmos-cpp-receiver executable
+    include(cmake/NmosCppReceiver.cmake)
 endif()
 
 if(NMOS_CPP_BUILD_TESTS)
