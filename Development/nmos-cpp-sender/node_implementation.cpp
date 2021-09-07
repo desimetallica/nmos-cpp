@@ -714,7 +714,7 @@ void node_implementation_thread(nmos::node_model& model, slog::base_gate& gate_)
         if (!insert_resource_after(delay_millis, model.channelmapping_resources, std::move(channelmapping_output), gate)) return;
     }
 
-*/
+
 
     // start background tasks to intermittently update the state of the event sources, to cause events to be emitted to connected receivers
 
@@ -777,10 +777,12 @@ void node_implementation_thread(nmos::node_model& model, slog::base_gate& gate_)
         });
     }, token);
 
+    */
+
         // start an extra implementation-specific HTTP listener
     web::http::experimental::listener::api_router extra_api;
 
-    extra_api.support(U("/control/?"), web::http::methods::POST, [&model, &gate](web::http::http_request req, web::http::http_response res, const utility::string_t&, const web::http::experimental::listener::route_parameters&)
+    extra_api.support(U("/control"), web::http::methods::POST, [&model, &gate](web::http::http_request req, web::http::http_response res, const utility::string_t&, const web::http::experimental::listener::route_parameters&)
     {
         return req.extract_string(true).then([&model, req, res, &gate](utility::string_t extra) mutable
         {
@@ -815,11 +817,12 @@ void node_implementation_thread(nmos::node_model& model, slog::base_gate& gate_)
 
     // wait for the thread to be interrupted because the server is being shut down
     model.shutdown_condition.wait(lock, [&] { return model.shutdown; });
-
+    /*
     cancellation_source.cancel();
     // wait without the lock since it is also used by the background tasks
     nmos::details::reverse_lock_guard<nmos::write_lock> unlock{ lock };
     events.wait();
+    */
 }
 
 // Example System API node behaviour callback to perform application-specific operations when the global configuration resource changes
