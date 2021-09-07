@@ -74,6 +74,9 @@ namespace impl
 
         // smpte2022_7: controls whether senders and receivers have one leg (false) or two legs (true, default)
         const web::json::field_as_bool_or smpte2022_7{ U("smpte2022_7"), true };
+
+         // extra_port: port number for the extra implementation-specific HTTP listener
+        const web::json::field_as_integer_or extra_port{ U("extra_port"), 9999 };
     }
 
     // the different kinds of 'port' (standing for the format/media type/event type) implemented by the example node
@@ -99,8 +102,11 @@ namespace impl
         // example number/enum event
         const port catcall{ U("c") };
 
+        // example externally-triggered event
+        const port extra{ U("x") };
+
         const std::vector<port> rtp{ video, audio, data, mux };
-        const std::vector<port> ws{ temperature, burn, nonsense, catcall };
+        const std::vector<port> ws{ temperature, burn, nonsense, catcall, extra };
         const std::vector<port> all{ boost::copy_range<std::vector<port>>(boost::range::join(rtp, ws)) };
     }
 
@@ -238,7 +244,222 @@ void node_implementation_thread(nmos::node_model& model, slog::base_gate& gate_)
         auto receiver_ids = impl::make_ids(seed_id, nmos::types::receiver, impl::ports::all, how_many);
         if (!insert_resource_after(delay_millis, model.node_resources, nmos::make_device(device_id, node_id, sender_ids, receiver_ids, model.settings), gate)) return;
     }
+    
+    // example receivers
+    for (int index = 0; index < how_many; ++index)
+    {
+        for (const auto& port : impl::ports::rtp)
+        {
+            const auto receiver_id = impl::make_id(seed_id, nmos::types::receiver, port, index);
 
+            nmos::resource receiver;
+            if (impl::ports::video == port)
+            {
+                receiver = nmos::make_video_receiver(receiver_id, device_id, nmos::transports::rtp_mcast, interface_names, model.settings);
+                // add an example constraint set; these should be completed fully!
+                const auto interlace_modes = nmos::rates::rate25 == frame_rate || nmos::rates::rate29_97 == frame_rate
+                    ? std::vector<utility::string_t>{ nmos::interlace_modes::interlaced_bff.name, nmos::interlace_modes::interlaced_tff.name, nmos::interlace_modes::interlaced_psf.name }
+                    : std::vector<utility::string_t>{ nmos::interlace_modes::progressive.name };
+                receiver.data[nmos::fields::caps][nmos::fields::constraint_sets] = value_of({
+                    value_of({
+                        { nmos::caps::format::grain_rate, nmos::make_caps_rational_constraint({ frame_rate }) },
+                        { nmos::caps::format::frame_width, nmos::make_caps_integer_constraint({ 1920 }) },
+                        { nmos::caps::format::frame_height, nmos::make_caps_integer_constraint({ 1080 }) },
+                        { nmos::caps::format::interlace_mode, nmos::make_caps_string_constraint(interlace_modes) },
+                        { nmos::caps::format::color_sampling, nmos::make_caps_string_constraint({ sdp::samplings::YCbCr_4_2_2.name }) }
+                    })
+                });
+                receiver.data[nmos::fields::version] = receiver.data[nmos::fields::caps][nmos::fields::version] = value(nmos::make_version());
+            }
+            else if (impl::ports::audio == port)
+            {
+                receiver = nmos::make_audio_receiver(receiver_id, device_id, nmos::transports::rtp_mcast, interface_names, 24, model.settings);
+                // add some example constraint sets; these should be completed fully!
+                receiver.data[nmos::fields::caps][nmos::fields::constraint_sets] = value_of({
+                    value_of({
+                        { nmos::caps::format::channel_count, nmos::make_caps_integer_constraint({}, 1, channel_count) },
+                        { nmos::caps::format::sample_rate, nmos::make_caps_rational_constraint({ { 48000, 1 } }) },
+                        { nmos::caps::format::sample_depth, nmos::make_caps_integer_constraint({ 16, 24 }) },
+                        { nmos::caps::transport::packet_time, nmos::make_caps_number_constraint({ 0.125 }) }
+                    }),
+                    value_of({
+                        { nmos::caps::meta::preference, -1 },
+                        { nmos::caps::format::channel_count, nmos::make_caps_integer_constraint({}, 1, (std::min)(8, channel_count)) },
+                        { nmos::caps::format::sample_rate, nmos::make_caps_rational_constraint({ { 48000, 1 } }) },
+                        { nmos::caps::format::sample_depth, nmos::make_caps_integer_constraint({ 16, 24 }) },
+                        { nmos::caps::transport::packet_time, nmos::make_caps_number_constraint({ 1 }) }
+                    })
+                });
+                receiver.data[nmos::fields::version] = receiver.data[nmos::fields::caps][nmos::fields::version] = value(nmos::make_version());
+            }
+            else if (impl::ports::data == port)
+            {
+                receiver = nmos::make_sdianc_data_receiver(receiver_id, device_id, nmos::transports::rtp_mcast, interface_names, model.settings);
+                // add an example constraint set; these should be completed fully!
+                receiver.data[nmos::fields::caps][nmos::fields::constraint_sets] = value_of({
+                    value_of({
+                        { nmos::caps::format::grain_rate, nmos::make_caps_rational_constraint({ frame_rate }) }
+                    })
+                });
+                receiver.data[nmos::fields::version] = receiver.data[nmos::fields::caps][nmos::fields::version] = value(nmos::make_version());
+            }
+            else if (impl::ports::mux == port)
+            {
+                receiver = nmos::make_mux_receiver(receiver_id, device_id, nmos::transports::rtp_mcast, interface_names, model.settings);
+                // add an example constraint set; these should be completed fully!
+                receiver.data[nmos::fields::caps][nmos::fields::constraint_sets] = value_of({
+                    value_of({
+                        { nmos::caps::format::grain_rate, nmos::make_caps_rational_constraint({ frame_rate }) }
+                    })
+                });
+                receiver.data[nmos::fields::version] = receiver.data[nmos::fields::caps][nmos::fields::version] = value(nmos::make_version());
+            }
+            impl::set_label_description(receiver, port, index);
+            impl::insert_group_hint(receiver, port, index);
+
+            auto connection_receiver = nmos::make_connection_rtp_receiver(receiver_id, smpte2022_7);
+            // add some example constraints; these should be completed fully!
+            connection_receiver.data[nmos::fields::endpoint_constraints][0][nmos::fields::interface_ip] = value_of({
+                { nmos::fields::constraint_enum, value_from_elements(primary_interface.addresses) }
+            });
+            if (smpte2022_7) connection_receiver.data[nmos::fields::endpoint_constraints][1][nmos::fields::interface_ip] = value_of({
+                { nmos::fields::constraint_enum, value_from_elements(secondary_interface.addresses) }
+            });
+
+            resolve_auto(receiver, connection_receiver, connection_receiver.data[nmos::fields::endpoint_active][nmos::fields::transport_params]);
+
+            if (!insert_resource_after(delay_millis, model.node_resources, std::move(receiver), gate)) return;
+            if (!insert_resource_after(delay_millis, model.connection_resources, std::move(connection_receiver), gate)) return;
+        }
+    }
+    
+    // example event receivers
+    for (int index = 0; index < how_many; ++index)
+    {
+        for (const auto& port : impl::ports::ws)
+        {
+            const auto receiver_id = impl::make_id(seed_id, nmos::types::receiver, port, index);
+
+            nmos::event_type event_type;
+            if (impl::ports::temperature == port)
+            {
+                // accept e.g. "number/temperature/F" or "number/temperature/K" as well as "number/temperature/C"
+                event_type = impl::temperature_wildcard;
+            }
+            else if (impl::ports::burn == port)
+            {
+                // accept any boolean
+                event_type = nmos::event_types::wildcard(nmos::event_types::boolean);
+            }
+            else if (impl::ports::nonsense == port)
+            {
+                // accept any string
+                event_type = nmos::event_types::wildcard(nmos::event_types::string);
+            }
+            else if (impl::ports::catcall == port)
+            {
+                // accept only a catcall
+                event_type = impl::catcall;
+            } 
+            else if (impl::ports::extra == port)
+            {
+                // accept any string
+                event_type = nmos::event_types::wildcard(nmos::event_types::string);
+            }
+
+            auto receiver = nmos::make_data_receiver(receiver_id, device_id, nmos::transports::websocket, { host_interface.name }, nmos::media_types::application_json, { event_type }, model.settings);
+            impl::set_label_description(receiver, port, index);
+            impl::insert_group_hint(receiver, port, index);
+
+            auto connection_receiver = nmos::make_connection_events_websocket_receiver(receiver_id, model.settings);
+            resolve_auto(receiver, connection_receiver, connection_receiver.data[nmos::fields::endpoint_active][nmos::fields::transport_params]);
+
+            if (!insert_resource_after(delay_millis, model.node_resources, std::move(receiver), gate)) return;
+            if (!insert_resource_after(delay_millis, model.connection_resources, std::move(connection_receiver), gate)) return;
+        }
+    }
+
+    /*
+    // example event sources, senders, flows
+    for (int index = 0; 0 <= nmos::fields::events_port(model.settings) && index < how_many; ++index)
+    {
+        for (const auto& port : impl::ports::ws)
+        {
+            const auto source_id = impl::make_id(seed_id, nmos::types::source, port, index);
+            const auto flow_id = impl::make_id(seed_id, nmos::types::flow, port, index);
+            const auto sender_id = impl::make_id(seed_id, nmos::types::sender, port, index);
+
+            nmos::event_type event_type;
+            web::json::value events_type;
+            web::json::value events_state;
+            if (impl::ports::temperature == port)
+            {
+                event_type = impl::temperature_Celsius;
+
+                // see https://github.com/AMWA-TV/nmos-event-tally/blob/v1.0.1/docs/3.0.%20Event%20types.md#231-measurements
+                // and https://github.com/AMWA-TV/nmos-event-tally/blob/v1.0.1/examples/eventsapi-type-number-measurement-get-200.json
+                // and https://github.com/AMWA-TV/nmos-event-tally/blob/v1.0.1/examples/eventsapi-state-number-measurement-get-200.json
+                events_type = nmos::make_events_number_type({ -200, 10 }, { 1000, 10 }, { 1, 10 }, U("C"));
+                events_state = nmos::make_events_number_state({ source_id, flow_id }, { 201, 10 }, event_type);
+            }
+            else if (impl::ports::burn == port)
+            {
+                event_type = nmos::event_types::boolean;
+
+                // see https://github.com/AMWA-TV/nmos-event-tally/blob/v1.0.1/docs/3.0.%20Event%20types.md#21-boolean
+                events_type = nmos::make_events_boolean_type();
+                events_state = nmos::make_events_boolean_state({ source_id, flow_id }, false);
+            }
+            else if (impl::ports::nonsense == port)
+            {
+                event_type = nmos::event_types::string;
+
+                // see https://github.com/AMWA-TV/nmos-event-tally/blob/v1.0.1/docs/3.0.%20Event%20types.md#22-string
+                // and of course, https://en.wikipedia.org/wiki/Metasyntactic_variable
+                events_type = nmos::make_events_string_type(0, 0, U("^foo|bar|baz|qu+x$"));
+                events_state = nmos::make_events_string_state({ source_id, flow_id }, U("foo"));
+            }
+            else if (impl::ports::catcall == port)
+            {
+                event_type = impl::catcall;
+
+                // see https://github.com/AMWA-TV/nmos-event-tally/blob/v1.0.1/docs/3.0.%20Event%20types.md#3-enum
+                events_type = nmos::make_events_number_enum_type({
+                    { 1, { U("meow"), U("chatty") } },
+                    { 2, { U("purr"), U("happy") } },
+                    { 4, { U("hiss"), U("afraid") } },
+                    { 8, { U("yowl"), U("sonorous") } }
+                });
+                events_state = nmos::make_events_number_state({ source_id, flow_id }, 1, event_type);
+            }
+
+            // grain_rate is not set because these events are aperiodic
+            auto source = nmos::make_data_source(source_id, device_id, {}, event_type, model.settings);
+            impl::set_label_description(source, port, index);
+
+            auto events_source = nmos::make_events_source(source_id, events_state, events_type);
+
+            auto flow = nmos::make_json_data_flow(flow_id, source_id, device_id, event_type, model.settings);
+            impl::set_label_description(flow, port, index);
+
+            auto sender = nmos::make_sender(sender_id, flow_id, nmos::transports::websocket, device_id, {}, { host_interface.name }, model.settings);
+            impl::set_label_description(sender, port, index);
+            impl::insert_group_hint(sender, port, index);
+
+            // initialize this sender enabled, just to enable the IS-07-02 test suite to run immediately
+            auto connection_sender = nmos::make_connection_events_websocket_sender(sender_id, device_id, source_id, model.settings);
+            connection_sender.data[nmos::fields::endpoint_active][nmos::fields::master_enable] = connection_sender.data[nmos::fields::endpoint_staged][nmos::fields::master_enable] = value::boolean(true);
+            resolve_auto(sender, connection_sender, connection_sender.data[nmos::fields::endpoint_active][nmos::fields::transport_params]);
+            nmos::set_resource_subscription(sender, nmos::fields::master_enable(connection_sender.data[nmos::fields::endpoint_active]), {}, nmos::tai_now());
+
+            if (!insert_resource_after(delay_millis, model.node_resources, std::move(source), gate)) return;
+            if (!insert_resource_after(delay_millis, model.node_resources, std::move(flow), gate)) return;
+            if (!insert_resource_after(delay_millis, model.node_resources, std::move(sender), gate)) return;
+            if (!insert_resource_after(delay_millis, model.connection_resources, std::move(connection_sender), gate)) return;
+            if (!insert_resource_after(delay_millis, model.events_resources, std::move(events_source), gate)) return;
+        }
+    }
+    
     // example sources, flows and senders
     for (int index = 0; index < how_many; ++index)
     {
@@ -335,215 +556,6 @@ void node_implementation_thread(nmos::node_model& model, slog::base_gate& gate_)
 
             if (!insert_resource_after(delay_millis, model.node_resources, std::move(sender), gate)) return;
             if (!insert_resource_after(delay_millis, model.connection_resources, std::move(connection_sender), gate)) return;
-        }
-    }
-
-    // example receivers
-    for (int index = 0; index < how_many; ++index)
-    {
-        for (const auto& port : impl::ports::rtp)
-        {
-            const auto receiver_id = impl::make_id(seed_id, nmos::types::receiver, port, index);
-
-            nmos::resource receiver;
-            if (impl::ports::video == port)
-            {
-                receiver = nmos::make_video_receiver(receiver_id, device_id, nmos::transports::rtp_mcast, interface_names, model.settings);
-                // add an example constraint set; these should be completed fully!
-                const auto interlace_modes = nmos::rates::rate25 == frame_rate || nmos::rates::rate29_97 == frame_rate
-                    ? std::vector<utility::string_t>{ nmos::interlace_modes::interlaced_bff.name, nmos::interlace_modes::interlaced_tff.name, nmos::interlace_modes::interlaced_psf.name }
-                    : std::vector<utility::string_t>{ nmos::interlace_modes::progressive.name };
-                receiver.data[nmos::fields::caps][nmos::fields::constraint_sets] = value_of({
-                    value_of({
-                        { nmos::caps::format::grain_rate, nmos::make_caps_rational_constraint({ frame_rate }) },
-                        { nmos::caps::format::frame_width, nmos::make_caps_integer_constraint({ 1920 }) },
-                        { nmos::caps::format::frame_height, nmos::make_caps_integer_constraint({ 1080 }) },
-                        { nmos::caps::format::interlace_mode, nmos::make_caps_string_constraint(interlace_modes) },
-                        { nmos::caps::format::color_sampling, nmos::make_caps_string_constraint({ sdp::samplings::YCbCr_4_2_2.name }) }
-                    })
-                });
-                receiver.data[nmos::fields::version] = receiver.data[nmos::fields::caps][nmos::fields::version] = value(nmos::make_version());
-            }
-            else if (impl::ports::audio == port)
-            {
-                receiver = nmos::make_audio_receiver(receiver_id, device_id, nmos::transports::rtp_mcast, interface_names, 24, model.settings);
-                // add some example constraint sets; these should be completed fully!
-                receiver.data[nmos::fields::caps][nmos::fields::constraint_sets] = value_of({
-                    value_of({
-                        { nmos::caps::format::channel_count, nmos::make_caps_integer_constraint({}, 1, channel_count) },
-                        { nmos::caps::format::sample_rate, nmos::make_caps_rational_constraint({ { 48000, 1 } }) },
-                        { nmos::caps::format::sample_depth, nmos::make_caps_integer_constraint({ 16, 24 }) },
-                        { nmos::caps::transport::packet_time, nmos::make_caps_number_constraint({ 0.125 }) }
-                    }),
-                    value_of({
-                        { nmos::caps::meta::preference, -1 },
-                        { nmos::caps::format::channel_count, nmos::make_caps_integer_constraint({}, 1, (std::min)(8, channel_count)) },
-                        { nmos::caps::format::sample_rate, nmos::make_caps_rational_constraint({ { 48000, 1 } }) },
-                        { nmos::caps::format::sample_depth, nmos::make_caps_integer_constraint({ 16, 24 }) },
-                        { nmos::caps::transport::packet_time, nmos::make_caps_number_constraint({ 1 }) }
-                    })
-                });
-                receiver.data[nmos::fields::version] = receiver.data[nmos::fields::caps][nmos::fields::version] = value(nmos::make_version());
-            }
-            else if (impl::ports::data == port)
-            {
-                receiver = nmos::make_sdianc_data_receiver(receiver_id, device_id, nmos::transports::rtp_mcast, interface_names, model.settings);
-                // add an example constraint set; these should be completed fully!
-                receiver.data[nmos::fields::caps][nmos::fields::constraint_sets] = value_of({
-                    value_of({
-                        { nmos::caps::format::grain_rate, nmos::make_caps_rational_constraint({ frame_rate }) }
-                    })
-                });
-                receiver.data[nmos::fields::version] = receiver.data[nmos::fields::caps][nmos::fields::version] = value(nmos::make_version());
-            }
-            else if (impl::ports::mux == port)
-            {
-                receiver = nmos::make_mux_receiver(receiver_id, device_id, nmos::transports::rtp_mcast, interface_names, model.settings);
-                // add an example constraint set; these should be completed fully!
-                receiver.data[nmos::fields::caps][nmos::fields::constraint_sets] = value_of({
-                    value_of({
-                        { nmos::caps::format::grain_rate, nmos::make_caps_rational_constraint({ frame_rate }) }
-                    })
-                });
-                receiver.data[nmos::fields::version] = receiver.data[nmos::fields::caps][nmos::fields::version] = value(nmos::make_version());
-            }
-            impl::set_label_description(receiver, port, index);
-            impl::insert_group_hint(receiver, port, index);
-
-            auto connection_receiver = nmos::make_connection_rtp_receiver(receiver_id, smpte2022_7);
-            // add some example constraints; these should be completed fully!
-            connection_receiver.data[nmos::fields::endpoint_constraints][0][nmos::fields::interface_ip] = value_of({
-                { nmos::fields::constraint_enum, value_from_elements(primary_interface.addresses) }
-            });
-            if (smpte2022_7) connection_receiver.data[nmos::fields::endpoint_constraints][1][nmos::fields::interface_ip] = value_of({
-                { nmos::fields::constraint_enum, value_from_elements(secondary_interface.addresses) }
-            });
-
-            resolve_auto(receiver, connection_receiver, connection_receiver.data[nmos::fields::endpoint_active][nmos::fields::transport_params]);
-
-            if (!insert_resource_after(delay_millis, model.node_resources, std::move(receiver), gate)) return;
-            if (!insert_resource_after(delay_millis, model.connection_resources, std::move(connection_receiver), gate)) return;
-        }
-    }
-
-    // example event sources, senders, flows
-    for (int index = 0; 0 <= nmos::fields::events_port(model.settings) && index < how_many; ++index)
-    {
-        for (const auto& port : impl::ports::ws)
-        {
-            const auto source_id = impl::make_id(seed_id, nmos::types::source, port, index);
-            const auto flow_id = impl::make_id(seed_id, nmos::types::flow, port, index);
-            const auto sender_id = impl::make_id(seed_id, nmos::types::sender, port, index);
-
-            nmos::event_type event_type;
-            web::json::value events_type;
-            web::json::value events_state;
-            if (impl::ports::temperature == port)
-            {
-                event_type = impl::temperature_Celsius;
-
-                // see https://github.com/AMWA-TV/nmos-event-tally/blob/v1.0.1/docs/3.0.%20Event%20types.md#231-measurements
-                // and https://github.com/AMWA-TV/nmos-event-tally/blob/v1.0.1/examples/eventsapi-type-number-measurement-get-200.json
-                // and https://github.com/AMWA-TV/nmos-event-tally/blob/v1.0.1/examples/eventsapi-state-number-measurement-get-200.json
-                events_type = nmos::make_events_number_type({ -200, 10 }, { 1000, 10 }, { 1, 10 }, U("C"));
-                events_state = nmos::make_events_number_state({ source_id, flow_id }, { 201, 10 }, event_type);
-            }
-            else if (impl::ports::burn == port)
-            {
-                event_type = nmos::event_types::boolean;
-
-                // see https://github.com/AMWA-TV/nmos-event-tally/blob/v1.0.1/docs/3.0.%20Event%20types.md#21-boolean
-                events_type = nmos::make_events_boolean_type();
-                events_state = nmos::make_events_boolean_state({ source_id, flow_id }, false);
-            }
-            else if (impl::ports::nonsense == port)
-            {
-                event_type = nmos::event_types::string;
-
-                // see https://github.com/AMWA-TV/nmos-event-tally/blob/v1.0.1/docs/3.0.%20Event%20types.md#22-string
-                // and of course, https://en.wikipedia.org/wiki/Metasyntactic_variable
-                events_type = nmos::make_events_string_type(0, 0, U("^foo|bar|baz|qu+x$"));
-                events_state = nmos::make_events_string_state({ source_id, flow_id }, U("foo"));
-            }
-            else if (impl::ports::catcall == port)
-            {
-                event_type = impl::catcall;
-
-                // see https://github.com/AMWA-TV/nmos-event-tally/blob/v1.0.1/docs/3.0.%20Event%20types.md#3-enum
-                events_type = nmos::make_events_number_enum_type({
-                    { 1, { U("meow"), U("chatty") } },
-                    { 2, { U("purr"), U("happy") } },
-                    { 4, { U("hiss"), U("afraid") } },
-                    { 8, { U("yowl"), U("sonorous") } }
-                });
-                events_state = nmos::make_events_number_state({ source_id, flow_id }, 1, event_type);
-            }
-
-            // grain_rate is not set because these events are aperiodic
-            auto source = nmos::make_data_source(source_id, device_id, {}, event_type, model.settings);
-            impl::set_label_description(source, port, index);
-
-            auto events_source = nmos::make_events_source(source_id, events_state, events_type);
-
-            auto flow = nmos::make_json_data_flow(flow_id, source_id, device_id, event_type, model.settings);
-            impl::set_label_description(flow, port, index);
-
-            auto sender = nmos::make_sender(sender_id, flow_id, nmos::transports::websocket, device_id, {}, { host_interface.name }, model.settings);
-            impl::set_label_description(sender, port, index);
-            impl::insert_group_hint(sender, port, index);
-
-            // initialize this sender enabled, just to enable the IS-07-02 test suite to run immediately
-            auto connection_sender = nmos::make_connection_events_websocket_sender(sender_id, device_id, source_id, model.settings);
-            connection_sender.data[nmos::fields::endpoint_active][nmos::fields::master_enable] = connection_sender.data[nmos::fields::endpoint_staged][nmos::fields::master_enable] = value::boolean(true);
-            resolve_auto(sender, connection_sender, connection_sender.data[nmos::fields::endpoint_active][nmos::fields::transport_params]);
-            nmos::set_resource_subscription(sender, nmos::fields::master_enable(connection_sender.data[nmos::fields::endpoint_active]), {}, nmos::tai_now());
-
-            if (!insert_resource_after(delay_millis, model.node_resources, std::move(source), gate)) return;
-            if (!insert_resource_after(delay_millis, model.node_resources, std::move(flow), gate)) return;
-            if (!insert_resource_after(delay_millis, model.node_resources, std::move(sender), gate)) return;
-            if (!insert_resource_after(delay_millis, model.connection_resources, std::move(connection_sender), gate)) return;
-            if (!insert_resource_after(delay_millis, model.events_resources, std::move(events_source), gate)) return;
-        }
-    }
-
-    // example event receivers
-    for (int index = 0; index < how_many; ++index)
-    {
-        for (const auto& port : impl::ports::ws)
-        {
-            const auto receiver_id = impl::make_id(seed_id, nmos::types::receiver, port, index);
-
-            nmos::event_type event_type;
-            if (impl::ports::temperature == port)
-            {
-                // accept e.g. "number/temperature/F" or "number/temperature/K" as well as "number/temperature/C"
-                event_type = impl::temperature_wildcard;
-            }
-            else if (impl::ports::burn == port)
-            {
-                // accept any boolean
-                event_type = nmos::event_types::wildcard(nmos::event_types::boolean);
-            }
-            else if (impl::ports::nonsense == port)
-            {
-                // accept any string
-                event_type = nmos::event_types::wildcard(nmos::event_types::string);
-            }
-            else if (impl::ports::catcall == port)
-            {
-                // accept only a catcall
-                event_type = impl::catcall;
-            }
-
-            auto receiver = nmos::make_data_receiver(receiver_id, device_id, nmos::transports::websocket, { host_interface.name }, nmos::media_types::application_json, { event_type }, model.settings);
-            impl::set_label_description(receiver, port, index);
-            impl::insert_group_hint(receiver, port, index);
-
-            auto connection_receiver = nmos::make_connection_events_websocket_receiver(receiver_id, model.settings);
-            resolve_auto(receiver, connection_receiver, connection_receiver.data[nmos::fields::endpoint_active][nmos::fields::transport_params]);
-
-            if (!insert_resource_after(delay_millis, model.node_resources, std::move(receiver), gate)) return;
-            if (!insert_resource_after(delay_millis, model.connection_resources, std::move(connection_receiver), gate)) return;
         }
     }
 
@@ -714,6 +726,8 @@ void node_implementation_thread(nmos::node_model& model, slog::base_gate& gate_)
         if (!insert_resource_after(delay_millis, model.channelmapping_resources, std::move(channelmapping_output), gate)) return;
     }
 
+    
+    
     // start background tasks to intermittently update the state of the event sources, to cause events to be emitted to connected receivers
 
     nmos::details::seed_generator events_seeder;
@@ -772,7 +786,8 @@ void node_implementation_thread(nmos::node_model& model, slog::base_gate& gate_)
             return true;
         });
     }, token);
-
+    
+   
     // wait for the thread to be interrupted because the server is being shut down
     model.shutdown_condition.wait(lock, [&] { return model.shutdown; });
 
@@ -780,6 +795,7 @@ void node_implementation_thread(nmos::node_model& model, slog::base_gate& gate_)
     // wait without the lock since it is also used by the background tasks
     nmos::details::reverse_lock_guard<nmos::write_lock> unlock{ lock };
     events.wait();
+    */
 }
 
 // Example System API node behaviour callback to perform application-specific operations when the global configuration resource changes
@@ -983,7 +999,24 @@ nmos::events_ws_message_handler make_node_implementation_events_ws_message_handl
             }
             else if (nmos::is_matching_event_type(nmos::event_types::wildcard(nmos::event_types::string), event_type))
             {
+                mqtt::connect_options connOpts;
+                connOpts.set_keep_alive_interval(impl::broker::KEEPALIVE);
+                connOpts.set_clean_session(true);
+                connOpts.set_connect_timeout(impl::broker::TIMEOUT);
+
+                mqtt::async_client client(impl::broker::SERVER_ADDRESS, impl::broker::CLIENT_ID, impl::broker::PERSIST_DIR);
+
+                mqtt::token_ptr conntok = client.connect(connOpts);
+                conntok->wait();
+                
                 slog::log<slog::severities::more_info>(gate, SLOG_FLF) << nmos::stash_category(impl::categories::node_implementation) << "Event received: " << nmos::fields::payload_string_value(payload) << " (" << event_type.name << ")";
+                
+                mqtt::message_ptr pubmsg = mqtt::make_message(impl::broker::TOPIC, nmos::fields::payload_string_value(payload));
+                pubmsg->set_qos(impl::broker::QOS);
+                client.publish(pubmsg)->wait_for(impl::broker::TIMEOUT);
+                slog::log<slog::severities::more_info>(gate, SLOG_FLF) << nmos::stash_category(impl::categories::node_implementation) << "Event published on MQTT: " << nmos::fields::payload_string_value(payload) << " (" << event_type.name << ")";
+                
+                client.disconnect(impl::broker::TIMEOUT)->wait();
             }
             else if (nmos::is_matching_event_type(nmos::event_types::wildcard(nmos::event_types::boolean), event_type))
             {
