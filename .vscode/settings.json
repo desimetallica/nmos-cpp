@@ -18,5 +18,9 @@
                 "ignoreFailures": true
             }
         ]
+    },
+    "files.associations": {
+        "*.tcc": "cpp",
+        "istream": "cpp"
     }
 }

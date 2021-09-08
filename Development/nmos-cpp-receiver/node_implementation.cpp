@@ -121,13 +121,15 @@ namespace impl
     {
         // destination parameter for cyanview where to move?
         const std::string TOPIC { "cy-rcp-18-34/qrm9s7/camhead/status/persist/gain" };
+        const std::string CYANVIEW_OFFSET { "cy-rcp-18-80/d9fmmh/camhead/action/add/offset" }; 
+        const std::string CYANVIEW_SHUTTER { "cy-rio-15-173/1ep1mdy/camhead/action/mult/exp" }; 
         
         //move into json
         const int QOS = 1;
         const std::string PERSIST_DIR {"./persist"};
         const long TIMEOUT = 200;
         const int KEEPALIVE = 10;
-        const std::string SERVER_ADDRESS { "tcp://10.54.131.158:1883" };
+        const std::string SERVER_ADDRESS { "tcp://10.54.128.42:1883" };
         const std::string CLIENT_ID { "sync_publish_cpp" };
     }
 
@@ -169,8 +171,6 @@ void node_implementation_thread(nmos::node_model& model, slog::base_gate& gate_)
     const auto node_id = impl::make_id(seed_id, nmos::types::node);
     const auto device_id = impl::make_id(seed_id, nmos::types::device);
     const auto how_many = impl::fields::how_many(model.settings);
-    const auto frame_rate = nmos::parse_rational(impl::fields::frame_rate(model.settings));
-    const auto channel_count = impl::fields::channel_count(model.settings);
     const auto smpte2022_7 = impl::fields::smpte2022_7(model.settings);
 
     // any delay between updates to the model resources is unnecessary
@@ -245,6 +245,53 @@ void node_implementation_thread(nmos::node_model& model, slog::base_gate& gate_)
         if (!insert_resource_after(delay_millis, model.node_resources, nmos::make_device(device_id, node_id, sender_ids, receiver_ids, model.settings), gate)) return;
     }
     
+    // example event receivers
+    for (int index = 0; index < how_many; ++index)
+    {
+        for (const auto& port : impl::ports::ws)
+        {
+            const auto receiver_id = impl::make_id(seed_id, nmos::types::receiver, port, index);
+
+            nmos::event_type event_type;
+            if (impl::ports::temperature == port)
+            {
+                // accept e.g. "number/temperature/F" or "number/temperature/K" as well as "number/temperature/C"
+                event_type = impl::temperature_wildcard;
+            }
+            else if (impl::ports::burn == port)
+            {
+                // accept any boolean
+                event_type = nmos::event_types::wildcard(nmos::event_types::boolean);
+            }
+            else if (impl::ports::nonsense == port)
+            {
+                // accept any string
+                event_type = nmos::event_types::wildcard(nmos::event_types::string);
+            }
+            else if (impl::ports::catcall == port)
+            {
+                // accept only a catcall
+                event_type = impl::catcall;
+            } 
+            else if (impl::ports::extra == port)
+            {
+                // accept any string
+                event_type = nmos::event_types::wildcard(nmos::event_types::string);
+            }
+
+            auto receiver = nmos::make_data_receiver(receiver_id, device_id, nmos::transports::websocket, { host_interface.name }, nmos::media_types::application_json, { event_type }, model.settings);
+            impl::set_label_description(receiver, port, index);
+            impl::insert_group_hint(receiver, port, index);
+
+            auto connection_receiver = nmos::make_connection_events_websocket_receiver(receiver_id, model.settings);
+            resolve_auto(receiver, connection_receiver, connection_receiver.data[nmos::fields::endpoint_active][nmos::fields::transport_params]);
+
+            if (!insert_resource_after(delay_millis, model.node_resources, std::move(receiver), gate)) return;
+            if (!insert_resource_after(delay_millis, model.connection_resources, std::move(connection_receiver), gate)) return;
+        }
+    }
+
+    /*
     // example receivers
     for (int index = 0; index < how_many; ++index)
     {
@@ -333,53 +380,8 @@ void node_implementation_thread(nmos::node_model& model, slog::base_gate& gate_)
         }
     }
     
-    // example event receivers
-    for (int index = 0; index < how_many; ++index)
-    {
-        for (const auto& port : impl::ports::ws)
-        {
-            const auto receiver_id = impl::make_id(seed_id, nmos::types::receiver, port, index);
 
-            nmos::event_type event_type;
-            if (impl::ports::temperature == port)
-            {
-                // accept e.g. "number/temperature/F" or "number/temperature/K" as well as "number/temperature/C"
-                event_type = impl::temperature_wildcard;
-            }
-            else if (impl::ports::burn == port)
-            {
-                // accept any boolean
-                event_type = nmos::event_types::wildcard(nmos::event_types::boolean);
-            }
-            else if (impl::ports::nonsense == port)
-            {
-                // accept any string
-                event_type = nmos::event_types::wildcard(nmos::event_types::string);
-            }
-            else if (impl::ports::catcall == port)
-            {
-                // accept only a catcall
-                event_type = impl::catcall;
-            } 
-            else if (impl::ports::extra == port)
-            {
-                // accept any string
-                event_type = nmos::event_types::wildcard(nmos::event_types::string);
-            }
-
-            auto receiver = nmos::make_data_receiver(receiver_id, device_id, nmos::transports::websocket, { host_interface.name }, nmos::media_types::application_json, { event_type }, model.settings);
-            impl::set_label_description(receiver, port, index);
-            impl::insert_group_hint(receiver, port, index);
-
-            auto connection_receiver = nmos::make_connection_events_websocket_receiver(receiver_id, model.settings);
-            resolve_auto(receiver, connection_receiver, connection_receiver.data[nmos::fields::endpoint_active][nmos::fields::transport_params]);
-
-            if (!insert_resource_after(delay_millis, model.node_resources, std::move(receiver), gate)) return;
-            if (!insert_resource_after(delay_millis, model.connection_resources, std::move(connection_receiver), gate)) return;
-        }
-    }
-
-    /*
+    
     // example event sources, senders, flows
     for (int index = 0; 0 <= nmos::fields::events_port(model.settings) && index < how_many; ++index)
     {
@@ -999,6 +1001,7 @@ nmos::events_ws_message_handler make_node_implementation_events_ws_message_handl
             }
             else if (nmos::is_matching_event_type(nmos::event_types::wildcard(nmos::event_types::string), event_type))
             {
+                // event string received 
                 mqtt::connect_options connOpts;
                 connOpts.set_keep_alive_interval(impl::broker::KEEPALIVE);
                 connOpts.set_clean_session(true);
@@ -1009,9 +1012,10 @@ nmos::events_ws_message_handler make_node_implementation_events_ws_message_handl
                 mqtt::token_ptr conntok = client.connect(connOpts);
                 conntok->wait();
                 
+
                 slog::log<slog::severities::more_info>(gate, SLOG_FLF) << nmos::stash_category(impl::categories::node_implementation) << "Event received: " << nmos::fields::payload_string_value(payload) << " (" << event_type.name << ")";
                 
-                mqtt::message_ptr pubmsg = mqtt::make_message(impl::broker::TOPIC, nmos::fields::payload_string_value(payload));
+                mqtt::message_ptr pubmsg = mqtt::make_message(impl::broker::CYANVIEW_SHUTTER, nmos::fields::payload_string_value(payload));
                 pubmsg->set_qos(impl::broker::QOS);
                 client.publish(pubmsg)->wait_for(impl::broker::TIMEOUT);
                 slog::log<slog::severities::more_info>(gate, SLOG_FLF) << nmos::stash_category(impl::categories::node_implementation) << "Event published on MQTT: " << nmos::fields::payload_string_value(payload) << " (" << event_type.name << ")";
