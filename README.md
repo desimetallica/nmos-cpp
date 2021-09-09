@@ -1,153 +1,63 @@
-# An NMOS C++ Implementation [![Build Status](https://github.com/sony/nmos-cpp/workflows/build-test/badge.svg)][build-test]
-[build-test]: https://github.com/sony/nmos-cpp/actions?query=workflow%3Abuild-test
+# An NMOS C++ Implementation for remote camera control [![Build Status](https://github.com/desimetallica/nmos-cpp/workflows/build-test/badge.svg)][build-test]
+[build-test]: https://github.com/desimetallica/nmos-cpp/actions?query=workflow%3Abuild-test
 
 ## Introduction
 
-This repository contains an implementation of the [AMWA Networked Media Open Specifications](https://specs.amwa.tv/nmos/) in C++, [licensed](LICENSE) under the terms of the Apache License 2.0.
+The 5G-Records nmos-cpp software is modified version of the open source Sony nmos-cpp software available on the Sony git repository ( https://github.com/sony/nmos-cpp ) and is subject to the open source license agreement described in the repository.
 
-- [AMWA IS-04 NMOS Discovery and Registration Specification](https://specs.amwa.tv/is-04/)
-- [AMWA IS-05 NMOS Device Connection Management Specification](https://specs.amwa.tv/is-05/)
-- [AMWA IS-07 NMOS Event & Tally Specification](https://specs.amwa.tv/is-07/)
-- [AMWA IS-08 NMOS Audio Channel Mapping Specification](https://specs.amwa.tv/is-08/)
-- [AMWA IS-09 NMOS System Parameters Specification](https://specs.amwa.tv/is-09/) (originally defined in JT-NM TR-1001-1:2018 Annex A)
-- [AMWA BCP-002-01 NMOS Grouping Recommendations - Natural Grouping](https://specs.amwa.tv/bcp-002-01/)
-- [AMWA BCP-003-01 Secure Communication in NMOS Systems](https://specs.amwa.tv/bcp-003-01/)
-- [AMWA BCP-004-01 NMOS Receiver Capabilities](https://specs.amwa.tv/bcp-004-01/)
+The original nmos-cpp software creates a nmos-node and nmos-registry software. The nmos-node runs on a local media device and registers the device with the nmos-registry software running on separate server. Register devices can then be controlled by the nmos-js Ctrl App ( https://github.com/sony/nmos-js ).
 
-For more information about AMWA, NMOS and the Networked Media Incubator, please refer to <http://amwa.tv/>.
+The current development has been made with Visul Studio Code Insiders:
 
-- The [nmos module](Development/nmos) includes implementations of the NMOS Node, Registration and Query APIs, the NMOS Connection API, and so on.
-- The [nmos-cpp-registry application](Development/nmos-cpp-registry) provides a simple but functional instance of an NMOS Registration & Discovery System (RDS), utilising the nmos module.
-- The [nmos-cpp-node application](Development/nmos-cpp-node) provides an example NMOS Node, also utilising the nmos module.
+- The [.vscode](.vscode) folder includes configurations of the workspace.
+- The [.devcontainer](.devcontainer) folder includes the configurations related to the develop container used by VsCode and some extension used by the editor.
+- The project provides also some dockerfile to build the images and run the examples nodes.
 
-The [repository structure](Documents/Repository-Structure.md), and the [external dependencies](Documents/Dependencies.md), are outlined in the documentation.
-Some information about the overall design of **nmos-cpp** is also included in the [architecture](Documents/Architecture.md) documentation.
+The source code has been modified to include some functionalities required and addittional examples nodes has been created to provide an environment to test the funcionalities of the remote camera control setup.
 
-### Getting Started With NMOS
+- Imported a Mqtt library paho-mqtt-c/1.3.8 and paho-mqtt-cpp/1.2.0 in order to connect to remote MQTT server.
+- Created a proper API at node_implementation.cpp level that enables the user to cause an IS-07 event to be emitted by posting a string to a specific port.
+- Created the [nmos-cpp-sender](/Development/nmos-cpp-sender/node_implementation.cpp) provides an IS-07 source of events made for controlling scope
+- Created the [nmos-cpp-receiver](/Development/nmos-cpp-receiver/node_implementation.cpp) provides an IS-07 receiver of events in this node it is also present an MQTT publisher designed to interact with a remote MQTT server
 
-The [Easy-NMOS](https://github.com/rhastie/easy-nmos) starter kit allows the user to launch a simple NMOS setup with minimal installation steps.
-It relies on nmos-cpp to provide an NMOS Registry and a virtual NMOS Node in a Docker Compose network, along with the AMWA NMOS Testing Tool and supporting services.
+Both sender and receiver nodes can be packeged inside a docker image, you can build by yourself the image with the provided dockerfile.
 
-### Getting Started For Developers
+## Build and run docker images
 
-Easy-NMOS is also a great first way to explore the relationship between NMOS services before building nmos-cpp for yourself.
+Note that to build the context shoulde be ./nmos-cpp directory:
 
-The codebase is intended to be portable, and the nmos-cpp [CMake project](Development/CMakeLists.txt) can be built on at least Linux, Windows and macOS.
+```bash
+docker build -f ./Development/nmos-cpp-receiver/dockerfile --tag=vsc-nmos-cpp-receiver:cameraControl .
+```  
 
-After setting up the dependencies, follow these [instructions](Documents/Getting-Started.md) to build and install nmos-cpp on your platform, and run the test suite.
+```bash
+docker build -f ./Development/nmos-cpp-sender/dockerfile --tag=vsc-nmos-cpp-sender:cameraControl .
+```  
+### Run:
+Nodes:
+```bash
+docker run --restart unless-stopped -d --net=bridge -v "/var/run/dbus:/var/run/dbus" -v "/var/run/avahi-daemon/socket:/var/run/avahi-daemon/socket" -v "./nmos-cpp/Development/nmos-cpp-receiver/receiver.json:/workspace/nmos-cpp/build/node.json" --privileged --name=nmos-cpp-receiver vsc-nmos-cpp-receiver:cameraControl
+```
 
-Next, try out the registry and node applications in the [tutorial](Documents/Tutorial.md).
+```bash
+docker run --restart unless-stopped -d --net=bridge -v "/var/run/dbus:/var/run/dbus" -v "/var/run/avahi-daemon/socket:/var/run/avahi-daemon/socket" -v "./nmos-cpp/Development/nmos-cpp-sender/sender.json:/workspace/nmos-cpp/build/node.json" --privileged --name=nmos-cpp-sender vsc-nmos-cpp-seder:cameraControl
+```
 
-## Agile Development
+Registry:
+```bash
+docker run --restart unless-stopped -d --net=bridge --privileged -e "RUN_NODE=FALSE" -v "./nmos-cpp/Development/nmos-cpp-registry/registry.json:/home/registry.json" -p 8080:8080 -p 8081:8081 --name docker-easy-nmos-registry rhastie/nmos-cpp:latest
+```
 
-[<img alt="JT-NM Tested 03/20 NMOS & TR-1001-1" src="Documents/images/jt-nm-tested-03-20-registry.png?raw=true" height="135" align="right"/>](https://jt-nm.org/jt-nm_tested/)
 
-The nmos-cpp applications, like the NMOS Specifications, are intended to be always ready, but steadily developing.
-They have been successfully tested in many AMWA Networked Media Incubator workshops, and are used as reference NMOS implementations in the [JT-NM Tested](https://jt-nm.org/jt-nm_tested/) programme.
-Several vendors have deployed JT-NM Tested badged products, using nmos-cpp, to their customers.
+## Test
+To check connectivty between the two NMOS nodes you can connect them via Nmos registry. Next you can check the event emission by running a CURL on the ip of the sender:
 
-### Build Status
+```bash
+curl -d "5.050000" -X POST http://172.17.0.2:9999/control
+```
 
-The following configurations, defined by the [build-test](.github/workflows/src/build-test.yml) jobs, are built and unit tested automatically via continuous integration.
+By subscribing on destination MQTT server it is possibile to check if the event has been posted into the right topic:
 
-| Platform | Version                  | Configuration Options                  |
-|----------|--------------------------|----------------------------------------|
-| Linux    | Ubuntu 20.04 (GCC 9.3.0) | mDNSResponder                          |
-| Linux    | Ubuntu 18.04 (GCC 7.5.0) | Avahi                                  |
-| Linux    | Ubuntu 18.04 (GCC 7.5.0) | mDNSResponder                          |
-| Linux    | Ubuntu 14.04 (GCC 4.8.4) | mDNSResponder, not using Conan         |
-| Windows  | Server 2019 (VS 2019)    | Bonjour (mDNSResponder)                |
-| macOS    | 10.15 (AppleClang 12.0)  | (Experimental)                         |
-
-The [AMWA NMOS API Testing Tool](https://github.com/AMWA-TV/nmos-testing) is automatically run against the APIs of the **nmos-cpp-node** and **nmos-cpp-registry** applications.
-
-**Test Suite/Status:**
-[![BCP-003-01][BCP-003-01-badge]][BCP-003-01-sheet]
-[![IS-04-01][IS-04-01-badge]][IS-04-01-sheet]
-[![IS-04-02][IS-04-02-badge]][IS-04-02-sheet]
-[![IS-04-03][IS-04-03-badge]][IS-04-03-sheet]
-[![IS-05-01][IS-05-01-badge]][IS-05-01-sheet]
-[![IS-05-02][IS-05-02-badge]][IS-05-02-sheet]
-[![IS-07-01][IS-07-01-badge]][IS-07-01-sheet]
-[![IS-07-02][IS-07-02-badge]][IS-07-02-sheet]
-[![IS-08-01][IS-08-01-badge]][IS-08-01-sheet]
-[![IS-08-02][IS-08-02-badge]][IS-08-02-sheet]
-[![IS-09-01][IS-09-01-badge]][IS-09-01-sheet]
-[![IS-09-02][IS-09-02-badge]][IS-09-02-sheet]
-
-[BCP-003-01-badge]: https://raw.githubusercontent.com/sony/nmos-cpp/badges/BCP-003-01.svg
-[IS-04-01-badge]: https://raw.githubusercontent.com/sony/nmos-cpp/badges/IS-04-01.svg
-[IS-04-02-badge]: https://raw.githubusercontent.com/sony/nmos-cpp/badges/IS-04-02.svg
-[IS-04-03-badge]: https://raw.githubusercontent.com/sony/nmos-cpp/badges/IS-04-03.svg
-[IS-05-01-badge]: https://raw.githubusercontent.com/sony/nmos-cpp/badges/IS-05-01.svg
-[IS-05-02-badge]: https://raw.githubusercontent.com/sony/nmos-cpp/badges/IS-05-02.svg
-[IS-07-01-badge]: https://raw.githubusercontent.com/sony/nmos-cpp/badges/IS-07-01.svg
-[IS-07-02-badge]: https://raw.githubusercontent.com/sony/nmos-cpp/badges/IS-07-02.svg
-[IS-08-01-badge]: https://raw.githubusercontent.com/sony/nmos-cpp/badges/IS-08-01.svg
-[IS-08-02-badge]: https://raw.githubusercontent.com/sony/nmos-cpp/badges/IS-08-02.svg
-[IS-09-01-badge]: https://raw.githubusercontent.com/sony/nmos-cpp/badges/IS-09-01.svg
-[IS-09-02-badge]: https://raw.githubusercontent.com/sony/nmos-cpp/badges/IS-09-02.svg
-[BCP-003-01-sheet]: https://docs.google.com/spreadsheets/d/1UgZoI0lGCMDn9-zssccf2Azil3WN6jogroMT8Wh6H64/edit#gid=468090822
-[IS-04-01-sheet]: https://docs.google.com/spreadsheets/d/1UgZoI0lGCMDn9-zssccf2Azil3WN6jogroMT8Wh6H64/edit#gid=0
-[IS-04-02-sheet]: https://docs.google.com/spreadsheets/d/1UgZoI0lGCMDn9-zssccf2Azil3WN6jogroMT8Wh6H64/edit#gid=1838684224
-[IS-04-03-sheet]: https://docs.google.com/spreadsheets/d/1UgZoI0lGCMDn9-zssccf2Azil3WN6jogroMT8Wh6H64/edit#gid=1174955447
-[IS-05-01-sheet]: https://docs.google.com/spreadsheets/d/1UgZoI0lGCMDn9-zssccf2Azil3WN6jogroMT8Wh6H64/edit#gid=517163955
-[IS-05-02-sheet]: https://docs.google.com/spreadsheets/d/1UgZoI0lGCMDn9-zssccf2Azil3WN6jogroMT8Wh6H64/edit#gid=205041321
-[IS-07-01-sheet]: https://docs.google.com/spreadsheets/d/1UgZoI0lGCMDn9-zssccf2Azil3WN6jogroMT8Wh6H64/edit#gid=828991990
-[IS-07-02-sheet]: https://docs.google.com/spreadsheets/d/1UgZoI0lGCMDn9-zssccf2Azil3WN6jogroMT8Wh6H64/edit#gid=367400040
-[IS-08-01-sheet]: https://docs.google.com/spreadsheets/d/1UgZoI0lGCMDn9-zssccf2Azil3WN6jogroMT8Wh6H64/edit#gid=776923255
-[IS-08-02-sheet]: https://docs.google.com/spreadsheets/d/1UgZoI0lGCMDn9-zssccf2Azil3WN6jogroMT8Wh6H64/edit#gid=1558470201
-[IS-09-01-sheet]: https://docs.google.com/spreadsheets/d/1UgZoI0lGCMDn9-zssccf2Azil3WN6jogroMT8Wh6H64/edit#gid=919453974
-[IS-09-02-sheet]: https://docs.google.com/spreadsheets/d/1UgZoI0lGCMDn9-zssccf2Azil3WN6jogroMT8Wh6H64/edit#gid=2135469955
-
-### Recent Activity
-
-The implementation is designed to be extended. Development is ongoing, following the evolution of the NMOS specifications in the AMWA Networked Media Incubator.
-
-Recent activity on the project (newest first):
-
-- Prepared a basic Conan recipe for building nmos-cpp, in [Sandbox/conan-recipe](Sandbox/conan-recipe)
-- Refactored the CMake build to make it easier to use nmos-cpp from another project, demonstrated by [Sandbox/my-nmos-node](Sandbox/my-nmos-node)
-- Added support for BCP-004-01 Receiver Capabilities
-- Switched CI testing to run the nmos-cpp applications and the AMWA NMOS Testing Tool with secure communication (TLS) enabled, as per BCP-003-01
-- Added support for the IS-08 Channel Mapping API
-- JT-NM Tested 03/20 badge
-- Switched Continous Integration to GitHub Actions and added Windows and macOS to the tested platforms
-- Extended the **nmos-cpp-node** to include mock senders/receivers of audio and ancillary data and offer some additional configuration settings
-- Simplified the build process to use Conan by default to download most of the dependencies
-- Added support in the Node implementation for discovery of, and interaction with, a System API, as required for compliance with TR-1001-1
-- Changed the implementation of `nmos::tai_clock` with the effect that it may no longer be monotonic
-- Added a minimum viable LLDP implementation (enabled by a CMake configuration option) to support sending and receiving the IS-04 v1.3 additional network data for Nodes required by IS-06
-- Update the IS-05 schemas to correct an unfortunate bug in the IS-05 v1.1 spec (see [AMWA-TV/nmos-device-connection-management#99](https://github.com/AMWA-TV/nmos-device-connection-management/pull/99))
-- Attempt to determine the DNS domain name automatically if not explicitly specified, for TR-1001-1
-- Travis CI integration
-- Updates for resolutions of specification issues in IS-04 v1.3 and IS-05 v1.1 final drafts
-- Experimental support for human-readable HTML rendering of NMOS responses
-- Experimental support for the rehomed (work in progress) IS-09 System API (originally defined in JT-NM TR-1001-1:2018 Annex A)
-- IS-07 Events API and Events WebSocket API implementation and updated nmos-cpp-node example
-- Experimental support for secure communications (HTTPS, WSS)
-- Bug fixes (with test cases added to the [AMWA NMOS API Testing Tool](https://github.com/AMWA-TV/nmos-testing))
-- Support for running nmos-cpp applications with forward/reverse proxies
-- Experimental support for JT-NM TR-1001-1 System API
-- Instructions for cross-compiling for the Raspberry Pi
-- Instructions for running the official AMWA NMOS API Testing Tool
-- Updates to build instructions and required dependencies
-- Simpler creation/processing of the types of SDP files required to support ST 2110 and ST 2022-7
-- Simpler run-time configuration of the **nmos-cpp-node** and **nmos-cpp-registry** settings
-- Some documentation about the overall design of nmos-cpp for developers
-- An implementation of the Connection API
-- A fix for a potential memory leak
-- An SDP parser/generator (to/from a JSON representation)
-- JSON Schema validation in the Registration API and the Query API
-- Cross-platform build support using CMake
-- An initial release of the **nmos-cpp-node** example application
-- Back-end enhancements as part of the NMOS Scalability Activity
-
-## Contributing
-
-We welcome bug reports, feature requests and contributions to the implementation and documentation.
-Please have a look at the simple [Contribution Guidelines](CONTRIBUTING.md).
-
-Thank you for your interest!
-
-![This project was formerly known as sea-lion.](Documents/images/sea-lion.png?raw=true)
+```bash
+mosquitto_sub -h 10.54.128.42 -P 1883 -v -t \#
+```
