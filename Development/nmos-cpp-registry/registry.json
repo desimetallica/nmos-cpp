@@ -1,0 +1,12 @@
+{
+    "domain": "local",
+    "logging_level": -20,
+    "http_trace": false,
+    "label": "easy-nmos-registry",
+    "http_port": 8080,
+    "query_ws_port": 8081,
+    "registration_expiry_interval": 12,
+    "registry_version": "v1.3",
+    "system_version": "v1.0"
+  }
+  
