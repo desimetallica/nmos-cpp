@@ -55,7 +55,7 @@ namespace impl
     namespace fields
     {
         // how_many: provides for very basic testing of a node with many sub-resources of each type
-        const web::json::field_as_integer_or how_many{ U("how_many"), 1 };
+        const web::json::field_as_integer_or how_many{ U("how_many"), 2 };
 
         // frame_rate: controls the grain_rate of video, audio and ancillary data sources and flows
         // and the equivalent parameter constraint on video receivers
@@ -124,13 +124,18 @@ namespace impl
         const std::string CYANVIEW_OFFSET { "cy-rcp-18-80/d9fmmh/camhead/action/add/offset" }; 
         const std::string CYANVIEW_SHUTTER { "cy-rio-15-173/1ep1mdy/camhead/action/mult/exp" }; 
         
-        //move into json
-        const int QOS = 1;
+        // default config if not present into json
+        const web::json::field_as_integer_or camera_control_broker_qos{ U("camera_control_broker_qos"), 1 };
+        const web::json::field_as_integer_or camera_control_broker_timeout{ U("camera_control_broker_timeout"), 400 };
+        const web::json::field_as_integer_or camera_control_broker_keepalive{ U("camera_control_broker_keepalive"), 20 };
+        const web::json::field_as_integer_or camera_control_broker_port{ U("camera_control_broker_port"), 1883 }; //not used yet
+        const web::json::field_as_string_or camera_control_broker_server_address{ U("camera_control_broker_server_address"), "tcp://10.54.128.42" };  
+        const web::json::field_as_string_or camera_control_broker_client_id{ U("camera_control_broker_client_id"), "nmos_client" };
+
+        const web::json::field_as_string_or camera_control_broker_test_topic{ U("camera_control_broker_test_topic"), "cy-rio-15-173/1ep1mdy/camhead/action/mult/exp" };
+
+        //persist folder not so useful for now
         const std::string PERSIST_DIR {"./persist"};
-        const long TIMEOUT = 200;
-        const int KEEPALIVE = 10;
-        const std::string SERVER_ADDRESS { "tcp://10.54.128.42:1883" };
-        const std::string CLIENT_ID { "sync_publish_cpp" };
     }
 
     // generate repeatable ids for the example node's resources
@@ -172,7 +177,7 @@ void node_implementation_thread(nmos::node_model& model, slog::base_gate& gate_)
     const auto device_id = impl::make_id(seed_id, nmos::types::device);
     const auto how_many = impl::fields::how_many(model.settings);
     const auto smpte2022_7 = impl::fields::smpte2022_7(model.settings);
-
+    
     // any delay between updates to the model resources is unnecessary
     // this just serves as a slightly more realistic example!
     const unsigned int delay_millis{ 10 };
@@ -962,11 +967,11 @@ nmos::events_ws_message_handler make_node_implementation_events_ws_message_handl
     const auto seed_id = nmos::experimental::fields::seed_id(model.settings);
     const auto how_many = impl::fields::how_many(model.settings);
     const auto receiver_ids = impl::make_ids(seed_id, nmos::types::receiver, impl::ports::ws, how_many);
-
+    
     // the message handler will be used for all Events WebSocket connections, and each connection may potentially
     // have subscriptions to a number of sources, for multiple receivers, so this example uses a handler adaptor
     // that enables simple processing of "state" messages (events) per receiver
-    return nmos::experimental::make_events_ws_message_handler(model, [receiver_ids, &gate](const nmos::resource& receiver, const nmos::resource& connection_receiver, const web::json::value& message)
+    return nmos::experimental::make_events_ws_message_handler(model, [receiver_ids, &gate, &model](const nmos::resource& receiver, const nmos::resource& connection_receiver, const web::json::value& message)
     {
         const auto found = boost::range::find(receiver_ids, connection_receiver.id);
         if (receiver_ids.end() != found)
@@ -974,14 +979,21 @@ nmos::events_ws_message_handler make_node_implementation_events_ws_message_handl
             const auto event_type = nmos::event_type(nmos::fields::state_event_type(message));
             const auto& payload = nmos::fields::state_payload(message);
 
+            const auto camera_control_broker_qos = impl::broker::camera_control_broker_qos(model.settings);
+            const auto camera_control_broker_timeout = impl::broker::camera_control_broker_timeout(model.settings);
+            const auto camera_control_broker_keepalive = impl::broker::camera_control_broker_keepalive(model.settings);
+            const auto camera_control_broker_port = impl::broker::camera_control_broker_port(model.settings); // not used yet
+            const auto camera_control_broker_server_address = impl::broker::camera_control_broker_server_address(model.settings);
+            const auto camera_control_broker_client_id = impl::broker::camera_control_broker_client_id(model.settings);
+
             if (nmos::is_matching_event_type(nmos::event_types::wildcard(nmos::event_types::number), event_type))
             {
                 mqtt::connect_options connOpts;
-                connOpts.set_keep_alive_interval(impl::broker::KEEPALIVE);
+                connOpts.set_keep_alive_interval(camera_control_broker_keepalive);
                 connOpts.set_clean_session(true);
-                connOpts.set_connect_timeout(impl::broker::TIMEOUT);
+                connOpts.set_connect_timeout(camera_control_broker_timeout);
 
-                mqtt::async_client client(impl::broker::SERVER_ADDRESS, impl::broker::CLIENT_ID, impl::broker::PERSIST_DIR);
+                mqtt::async_client client(camera_control_broker_server_address, camera_control_broker_client_id, impl::broker::PERSIST_DIR);
 
                 mqtt::token_ptr conntok = client.connect(connOpts);
                 conntok->wait();
@@ -991,23 +1003,23 @@ nmos::events_ws_message_handler make_node_implementation_events_ws_message_handl
                 
                 //mqtt::message_ptr pubmsg = mqtt::make_message(impl::broker::TOPIC, boost::lexical_cast<std::string>(value.scaled_value()));
                 mqtt::message_ptr pubmsg = mqtt::make_message(impl::broker::TOPIC, std::to_string(value.scaled_value()));
-                pubmsg->set_qos(impl::broker::QOS);
+                pubmsg->set_qos(camera_control_broker_qos);
                 
-                client.publish(pubmsg)->wait_for(impl::broker::TIMEOUT);
+                client.publish(pubmsg)->wait_for(camera_control_broker_timeout);
                 slog::log<slog::severities::more_info>(gate, SLOG_FLF) << nmos::stash_category(impl::categories::node_implementation) << "Event published on MQTT: " << value.scaled_value() << " (" << event_type.name << ")";
                 
-                client.disconnect(impl::broker::TIMEOUT)->wait();
+                client.disconnect(camera_control_broker_timeout)->wait();
                 slog::log<slog::severities::more_info>(gate, SLOG_FLF) << nmos::stash_category(impl::categories::node_implementation) << "MQTT client disconnected";
             }
             else if (nmos::is_matching_event_type(nmos::event_types::wildcard(nmos::event_types::string), event_type))
             {
                 // event string received 
                 mqtt::connect_options connOpts;
-                connOpts.set_keep_alive_interval(impl::broker::KEEPALIVE);
+                connOpts.set_keep_alive_interval(camera_control_broker_keepalive);
                 connOpts.set_clean_session(true);
-                connOpts.set_connect_timeout(impl::broker::TIMEOUT);
+                connOpts.set_connect_timeout(camera_control_broker_timeout);
 
-                mqtt::async_client client(impl::broker::SERVER_ADDRESS, impl::broker::CLIENT_ID, impl::broker::PERSIST_DIR);
+                mqtt::async_client client(camera_control_broker_server_address, camera_control_broker_client_id, impl::broker::PERSIST_DIR);
 
                 mqtt::token_ptr conntok = client.connect(connOpts);
                 conntok->wait();
@@ -1016,11 +1028,11 @@ nmos::events_ws_message_handler make_node_implementation_events_ws_message_handl
                 slog::log<slog::severities::more_info>(gate, SLOG_FLF) << nmos::stash_category(impl::categories::node_implementation) << "Event received: " << nmos::fields::payload_string_value(payload) << " (" << event_type.name << ")";
                 
                 mqtt::message_ptr pubmsg = mqtt::make_message(impl::broker::CYANVIEW_SHUTTER, nmos::fields::payload_string_value(payload));
-                pubmsg->set_qos(impl::broker::QOS);
-                client.publish(pubmsg)->wait_for(impl::broker::TIMEOUT);
+                pubmsg->set_qos(camera_control_broker_qos);
+                client.publish(pubmsg)->wait_for(camera_control_broker_timeout);
                 slog::log<slog::severities::more_info>(gate, SLOG_FLF) << nmos::stash_category(impl::categories::node_implementation) << "Event published on MQTT: " << nmos::fields::payload_string_value(payload) << " (" << event_type.name << ")";
                 
-                client.disconnect(impl::broker::TIMEOUT)->wait();
+                client.disconnect(camera_control_broker_timeout)->wait();
             }
             else if (nmos::is_matching_event_type(nmos::event_types::wildcard(nmos::event_types::boolean), event_type))
             {

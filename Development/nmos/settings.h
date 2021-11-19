@@ -188,7 +188,31 @@ namespace nmos
 
         // system_request_max [node]: timeout for interactions with the System API
         const web::json::field_as_integer_or system_request_max{ U("system_request_max"), 30 };
-    }
+
+        // camera control specific 
+        
+        // camera_control_broker_qos [node]: QoS of connection with MQTT server
+        const web::json::field_as_integer_or camera_control_broker_qos{ U("camera_control_broker_qos"), 1};
+
+        // camera_control_broker_timeout [node]: timeout of connection with MQTT server (ms)
+        const web::json::field_as_integer_or camera_control_broker_timeout{ U("camera_control_broker_timeout"), 200};
+
+        // camera_control_broker_keepalive [node]: keepalive of connection with MQTT server (ms)
+        const web::json::field_as_integer_or camera_control_broker_keepalive{ U("camera_control_broker_keepalive"), 10};
+
+        // camera_control_broker_port [node]: keepalive of connection with MQTT server (ms)
+        const web::json::field_as_integer_or camera_control_broker_port{ U("camera_control_broker_port"), 1883};
+        
+        // camera_control_broker_server_address [node]: address for remote MQTT server
+        const web::json::field_as_string_or camera_control_broker_server_address{ U("camera_control_broker_server_address"), U("tcp://localhost") };
+
+        // camera_control_broker_test_topic [node]: test topic to test the connection 
+        const web::json::field_as_string_or camera_control_broker_test_topic{ U("camera_control_broker_test_topic"), U("cy-rio-15-173/1ep1mdy/camhead/action/mult/exp") };
+        
+        // camera_control_broker_client_id [node]: MQTT client id 
+        const web::json::field_as_string_or camera_control_broker_client_id{ U("camera_control_broker_client_id"), U("nmos_client") };
+    
+    }   
 
     // Configuration settings and defaults for experimental extensions
     namespace experimental
