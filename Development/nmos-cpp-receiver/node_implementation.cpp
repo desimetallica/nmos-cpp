@@ -7,6 +7,7 @@
 #include <boost/range/algorithm_ext/push_back.hpp>
 #include <boost/range/irange.hpp>
 #include <boost/range/join.hpp>
+
 #include "pplx/pplx_utils.h" // for pplx::complete_after, etc.
 #include "cpprest/host_utils.h"
 #ifdef HAVE_LLDP
@@ -982,7 +983,7 @@ nmos::events_ws_message_handler make_node_implementation_events_ws_message_handl
             const auto camera_control_broker_qos = impl::broker::camera_control_broker_qos(model.settings);
             const auto camera_control_broker_timeout = impl::broker::camera_control_broker_timeout(model.settings);
             const auto camera_control_broker_keepalive = impl::broker::camera_control_broker_keepalive(model.settings);
-            const auto camera_control_broker_port = impl::broker::camera_control_broker_port(model.settings); // not used yet
+            //const auto camera_control_broker_port = impl::broker::camera_control_broker_port(model.settings); // not used yet
             const auto camera_control_broker_server_address = impl::broker::camera_control_broker_server_address(model.settings);
             const auto camera_control_broker_client_id = impl::broker::camera_control_broker_client_id(model.settings);
 
@@ -1024,15 +1025,30 @@ nmos::events_ws_message_handler make_node_implementation_events_ws_message_handl
                 mqtt::token_ptr conntok = client.connect(connOpts);
                 conntok->wait();
                 
+                std::string stringPayload = nmos::fields::payload_string_value(payload);
 
                 slog::log<slog::severities::more_info>(gate, SLOG_FLF) << nmos::stash_category(impl::categories::node_implementation) << "Event received: " << nmos::fields::payload_string_value(payload) << " (" << event_type.name << ")";
                 
-                mqtt::message_ptr pubmsg = mqtt::make_message(impl::broker::CYANVIEW_SHUTTER, nmos::fields::payload_string_value(payload));
-                pubmsg->set_qos(camera_control_broker_qos);
-                client.publish(pubmsg)->wait_for(camera_control_broker_timeout);
-                slog::log<slog::severities::more_info>(gate, SLOG_FLF) << nmos::stash_category(impl::categories::node_implementation) << "Event published on MQTT: " << nmos::fields::payload_string_value(payload) << " (" << event_type.name << ")";
-                
-                client.disconnect(camera_control_broker_timeout)->wait();
+                if (stringPayload.find(",")) {
+                    std::string delimiter = ",";
+                    std::string topic = stringPayload.substr(0, stringPayload.find(delimiter));
+                    stringPayload = stringPayload.erase(0, stringPayload.find(delimiter) + delimiter.length());
+                    slog::log<slog::severities::more_info>(gate, SLOG_FLF) 
+                        << nmos::stash_category(impl::categories::node_implementation) 
+                        << "IS-07 control elements received: " 
+                        << stringPayload 
+                        << "Topic is: "
+                        << topic
+                        << " (" << event_type.name << ")";                  
+
+
+                    mqtt::message_ptr pubmsg = mqtt::make_message(topic, stringPayload);
+                    pubmsg->set_qos(camera_control_broker_qos);
+                    client.publish(pubmsg)->wait_for(camera_control_broker_timeout);
+                    slog::log<slog::severities::more_info>(gate, SLOG_FLF) << nmos::stash_category(impl::categories::node_implementation) << "IS-07 control event published on MQTT: " << nmos::fields::payload_string_value(payload) << " (" << event_type.name << ")";
+                    
+                    client.disconnect(camera_control_broker_timeout)->wait();
+                }                
             }
             else if (nmos::is_matching_event_type(nmos::event_types::wildcard(nmos::event_types::boolean), event_type))
             {
