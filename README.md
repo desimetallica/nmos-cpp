@@ -53,8 +53,11 @@ docker run --restart unless-stopped -d --net=bridge --privileged -e "RUN_NODE=FA
 To check connectivty between the two NMOS nodes you can connect them via Nmos registry. Next you can check the event emission by running a CURL on the ip of the sender:
 
 ```bash
-curl -d "5.050000" -X POST http://172.17.0.2:9999/control
+curl -d "cy-rio-15-173/1ep1mdy/camhead/action/mult/export,2.9" -X POST http://172.17.0.2:9999/control
 ```
+Please note that the message format should be a couple [topic,value], in this way the receiver can push correct value into topic of remote MQTT server. To check the output on receiver you have to connect them from a registry frontend usually the Nvidia can do the job. 
+
+Check under receiver tab -> sony-nmos-receiver/receiver/x0 -> activate.
 
 By subscribing on destination MQTT server it is possibile to check if the event has been posted into the right topic:
 
