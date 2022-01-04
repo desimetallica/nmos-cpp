@@ -27,8 +27,14 @@ WORKDIR /workspace/nmos-cpp/build
 
 RUN rm /workspace/nmos-cpp/build/CMakeCache.txt
 
-RUN cmake ../Development -DCMAKE_BUILD_TYPE:STRING="debug"
+RUN cmake ../Development -DCMAKE_BUILD_TYPE:STRING="MinSizeRel" -DCMAKE_CONFIGURATION_TYPES:STRING="MinSizeRel"
 
 RUN make -j `nproc`
 
-ENTRYPOINT /workspace/nmos-cpp/build/nmos-cpp-receiver node.json
+WORKDIR /opt
+
+RUN cp /workspace/nmos-cpp/build/nmos-cpp-receiver /opt && \ 
+    cp /workspace/nmos-cpp/Development/nmos-cpp-receiver/receiver.json /opt/node.json && \
+    rm -rf /workspace/nmos-cpp
+
+ENTRYPOINT /opt/nmos-cpp-receiver node.json

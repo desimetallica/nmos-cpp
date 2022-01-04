@@ -802,9 +802,10 @@ void node_implementation_thread(nmos::node_model& model, slog::base_gate& gate_)
             }
 
             slog::log<slog::severities::more_info>(gate, SLOG_FLF) << "Extra event updated: " << extra;
-
+            
             model.notify();
-
+            res.headers().add(U("Access-Control-Allow-Origin"), U("*"));
+            res.set_body(U("Extra event updated"));
             set_reply(res, web::http::status_codes::OK);
 
             return true;
