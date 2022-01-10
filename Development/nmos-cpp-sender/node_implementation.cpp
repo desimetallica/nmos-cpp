@@ -475,7 +475,7 @@ void node_implementation_thread(nmos::node_model& model, slog::base_gate& gate_)
                 event_type = nmos::event_types::string;
 
                 events_type = nmos::make_events_string_type();
-                events_state = nmos::make_events_string_state({ source_id, flow_id }, U("Extra! Extra! Read all about it!"));
+                events_state = nmos::make_events_string_state({ source_id, flow_id }, U(""));
             }
 
             // grain_rate is not set because these events are aperiodic
