@@ -93,19 +93,14 @@ namespace impl
         // video/SMPTE2022-6
         const port mux{ U("m") };
 
-        // example measurement event
-        const port temperature{ U("t") };
-        // example boolean event
-        const port burn{ U("b") };
-        // example string event
-        const port nonsense{ U("s") };
-        // example number/enum event
-        const port catcall{ U("c") };
          // example externally-triggered event
         const port extra{ U("x") };
 
+        const port exposure { U("exposure") };
+        const port gain { U("gain") };
+
         const std::vector<port> rtp{ video, audio, data, mux };
-        const std::vector<port> ws{ temperature, burn, nonsense, catcall, extra };
+        const std::vector<port> ws{ extra, exposure, gain };
         const std::vector<port> all{ boost::copy_range<std::vector<port>>(boost::range::join(rtp, ws)) };
     }
 
@@ -430,52 +425,19 @@ void node_implementation_thread(nmos::node_model& model, slog::base_gate& gate_)
             nmos::event_type event_type;
             web::json::value events_type;
             web::json::value events_state;
-            if (impl::ports::temperature == port)
-            {
-                event_type = impl::temperature_Celsius;
-
-                // see https://github.com/AMWA-TV/nmos-event-tally/blob/v1.0.1/docs/3.0.%20Event%20types.md#231-measurements
-                // and https://github.com/AMWA-TV/nmos-event-tally/blob/v1.0.1/examples/eventsapi-type-number-measurement-get-200.json
-                // and https://github.com/AMWA-TV/nmos-event-tally/blob/v1.0.1/examples/eventsapi-state-number-measurement-get-200.json
-                events_type = nmos::make_events_number_type({ -200, 10 }, { 1000, 10 }, { 1, 10 }, U("C"));
-                events_state = nmos::make_events_number_state({ source_id, flow_id }, { 201, 10 }, event_type);
-            }
-            else if (impl::ports::burn == port)
-            {
-                event_type = nmos::event_types::boolean;
-
-                // see https://github.com/AMWA-TV/nmos-event-tally/blob/v1.0.1/docs/3.0.%20Event%20types.md#21-boolean
-                events_type = nmos::make_events_boolean_type();
-                events_state = nmos::make_events_boolean_state({ source_id, flow_id }, false);
-            }
-            else if (impl::ports::nonsense == port)
+            if (impl::ports::extra == port)
             {
                 event_type = nmos::event_types::string;
-
-                // see https://github.com/AMWA-TV/nmos-event-tally/blob/v1.0.1/docs/3.0.%20Event%20types.md#22-string
-                // and of course, https://en.wikipedia.org/wiki/Metasyntactic_variable
-                events_type = nmos::make_events_string_type(0, 0, U("^foo|bar|baz|qu+x$"));
-                events_state = nmos::make_events_string_state({ source_id, flow_id }, U("foo"));
-            }
-            else if (impl::ports::catcall == port)
-            {
-                event_type = impl::catcall;
-
-                // see https://github.com/AMWA-TV/nmos-event-tally/blob/v1.0.1/docs/3.0.%20Event%20types.md#3-enum
-                events_type = nmos::make_events_number_enum_type({
-                    { 1, { U("meow"), U("chatty") } },
-                    { 2, { U("purr"), U("happy") } },
-                    { 4, { U("hiss"), U("afraid") } },
-                    { 8, { U("yowl"), U("sonorous") } }
-                });
-                events_state = nmos::make_events_number_state({ source_id, flow_id }, 1, event_type);
-            } 
-            else if (impl::ports::extra == port)
-            {
-                event_type = nmos::event_types::string;
-
                 events_type = nmos::make_events_string_type();
                 events_state = nmos::make_events_string_state({ source_id, flow_id }, U(""));
+            } else if (impl::ports::exposure == port) {
+                event_type = nmos::event_types::number;
+                events_type = nmos::make_events_number_type({ -200, 10 }, { 1000, 10 }, { 1, 10 }, U(""));
+                events_state = nmos::make_events_number_state({ source_id, flow_id }, { 201, 10 }, event_type);
+            } else if (impl::ports::gain == port) {
+                event_type = nmos::event_types::number;
+                events_type = nmos::make_events_number_type({ -200, 10 }, { 1000, 10 }, { 1, 10 }, U(""));
+                events_state = nmos::make_events_number_state({ source_id, flow_id }, { 201, 10 }, event_type);
             }
 
             // grain_rate is not set because these events are aperiodic
@@ -806,6 +768,102 @@ void node_implementation_thread(nmos::node_model& model, slog::base_gate& gate_)
             model.notify();
             res.headers().add(U("Access-Control-Allow-Origin"), U("*"));
             res.set_body(U("Extra event updated"));
+            set_reply(res, web::http::status_codes::OK);
+
+            return true;
+        });
+    });
+
+    extra_api.support(U("/exposure"), web::http::methods::PATCH, [&model, &gate](web::http::http_request req, web::http::http_response res, const utility::string_t&, const web::http::experimental::listener::route_parameters&)
+    {
+        return req.extract_string(true).then([&model, req, res, &gate](utility::string_t exposure) mutable
+        {
+            auto lock = model.write_lock();
+            const auto seed_id = nmos::experimental::fields::seed_id(model.settings);
+            const auto how_many = impl::fields::how_many(model.settings);
+            double exposure_value;
+            
+            try {
+                exposure_value = std::stod( exposure );
+            } catch ( std::invalid_argument const& ) {
+                slog::log<slog::severities::more_info>(gate, SLOG_FLF) << "Unable to convert to int" << exposure;
+                model.notify();
+                res.headers().add(U("Access-Control-Allow-Origin"), U("*"));
+                res.set_body(exposure);
+                set_reply(res, web::http::status_codes::BadRequest);
+
+                return true;
+            }
+
+            for (int index = 0; index < how_many; ++index)
+            {
+                const auto source_id = impl::make_id(seed_id, nmos::types::source, impl::ports::exposure, index);
+                const auto flow_id = impl::make_id(seed_id, nmos::types::flow, impl::ports::exposure, index);
+                nmos::event_type event_type;
+                web::json::value events_type;
+                web::json::value events_state;
+
+                modify_resource(model.events_resources, source_id, [&](nmos::resource& resource)
+                {
+                    event_type = nmos::event_types::number;
+                    events_type = nmos::make_events_number_type({ -200, 10 }, { 1000, 10 }, { 1, 10 }, U(""));
+                    nmos::fields::endpoint_state(resource.data) = nmos::make_events_number_state({ source_id, flow_id }, { exposure_value, 10 }, event_type);
+                });
+            }
+
+            slog::log<slog::severities::more_info>(gate, SLOG_FLF) << "Exposure event updated: " << exposure;
+            
+            model.notify();
+            res.headers().add(U("Access-Control-Allow-Origin"), U("*"));
+            res.set_body(exposure);
+            set_reply(res, web::http::status_codes::OK);
+
+            return true;
+        });
+    });
+
+    extra_api.support(U("/gain"), web::http::methods::PATCH, [&model, &gate](web::http::http_request req, web::http::http_response res, const utility::string_t&, const web::http::experimental::listener::route_parameters&)
+    {
+        return req.extract_string(true).then([&model, req, res, &gate](utility::string_t gain) mutable
+        {
+            auto lock = model.write_lock();
+            const auto seed_id = nmos::experimental::fields::seed_id(model.settings);
+            const auto how_many = impl::fields::how_many(model.settings);
+            double gain_value;
+            
+            try {
+                gain_value = std::stod( gain );
+            } catch ( std::invalid_argument const& ) {
+                slog::log<slog::severities::more_info>(gate, SLOG_FLF) << "Unable to convert to int " << gain;
+                model.notify();
+                res.headers().add(U("Access-Control-Allow-Origin"), U("*"));
+                res.set_body(gain);
+                set_reply(res, web::http::status_codes::BadRequest);
+
+                return true;
+            }
+
+            for (int index = 0; index < how_many; ++index)
+            {
+                const auto source_id = impl::make_id(seed_id, nmos::types::source, impl::ports::gain, index);
+                const auto flow_id = impl::make_id(seed_id, nmos::types::flow, impl::ports::gain, index);
+                nmos::event_type event_type;
+                web::json::value events_type;
+                web::json::value events_state;
+
+                modify_resource(model.events_resources, source_id, [&](nmos::resource& resource)
+                {
+                    event_type = nmos::event_types::number;
+                    events_type = nmos::make_events_number_type({ -200, 10 }, { 1000, 10 }, { 1, 10 }, U(""));
+                    nmos::fields::endpoint_state(resource.data) = nmos::make_events_number_state({ source_id, flow_id }, { gain_value, 10 }, event_type);
+                });
+            }
+
+            slog::log<slog::severities::more_info>(gate, SLOG_FLF) << "Gain event updated: " << gain;
+            
+            model.notify();
+            res.headers().add(U("Access-Control-Allow-Origin"), U("*"));
+            res.set_body(gain);
             set_reply(res, web::http::status_codes::OK);
 
             return true;

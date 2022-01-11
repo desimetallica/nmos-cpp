@@ -15,7 +15,7 @@
     "camera_control_broker_qos": 1,
     "camera_control_broker_timeout": 400,
     "camera_control_broker_keepalive": 20,
-    "camera_control_broker_server_address": "tcp://172.17.0.6:11883",
+    "camera_control_broker_server_address": "tcp://172.17.0.3:11883",
     "camera_control_broker_test_topic": "cy-rio-15-173/1ep1mdy/camhead/action/mult/exp",
     "camera_control_broker_client_id": "nmos_receiver_client"
 }

@@ -11,5 +11,6 @@
     "registration_port": 8080,
     "system_port": 8080,
     "system_address": "172.17.0.4",
-    "system_version": "v1.1"
+    "system_version": "v1.1",
+    "seed_id": "374d5ebb-4a95-523c-89e9-0096cc1e3bfc"
 }

@@ -81,7 +81,18 @@
         "streambuf": "cpp",
         "thread": "cpp",
         "typeinfo": "cpp",
-        "valarray": "cpp"
+        "valarray": "cpp",
+        "*.dat": "cpp",
+        "csignal": "cpp",
+        "*.ipp": "cpp",
+        "any": "cpp",
+        "strstream": "cpp",
+        "complex": "cpp",
+        "source_location": "cpp",
+        "future": "cpp",
+        "cfenv": "cpp",
+        "typeindex": "cpp",
+        "variant": "cpp"
     },
     "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools"
 }

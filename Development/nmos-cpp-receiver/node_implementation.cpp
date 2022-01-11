@@ -94,20 +94,11 @@ namespace impl
         // video/SMPTE2022-6
         const port mux{ U("m") };
 
-        // example measurement event
-        const port temperature{ U("t") };
-        // example boolean event
-        const port burn{ U("b") };
-        // example string event
-        const port nonsense{ U("s") };
-        // example number/enum event
-        const port catcall{ U("c") };
-
         // example externally-triggered event
         const port extra{ U("x") };
 
         const std::vector<port> rtp{ video, audio, data, mux };
-        const std::vector<port> ws{ temperature, burn, nonsense, catcall, extra };
+        const std::vector<port> ws{ extra };
         const std::vector<port> all{ boost::copy_range<std::vector<port>>(boost::range::join(rtp, ws)) };
     }
 
@@ -259,27 +250,7 @@ void node_implementation_thread(nmos::node_model& model, slog::base_gate& gate_)
             const auto receiver_id = impl::make_id(seed_id, nmos::types::receiver, port, index);
 
             nmos::event_type event_type;
-            if (impl::ports::temperature == port)
-            {
-                // accept e.g. "number/temperature/F" or "number/temperature/K" as well as "number/temperature/C"
-                event_type = impl::temperature_wildcard;
-            }
-            else if (impl::ports::burn == port)
-            {
-                // accept any boolean
-                event_type = nmos::event_types::wildcard(nmos::event_types::boolean);
-            }
-            else if (impl::ports::nonsense == port)
-            {
-                // accept any string
-                event_type = nmos::event_types::wildcard(nmos::event_types::string);
-            }
-            else if (impl::ports::catcall == port)
-            {
-                // accept only a catcall
-                event_type = impl::catcall;
-            } 
-            else if (impl::ports::extra == port)
+            if (impl::ports::extra == port)
             {
                 // accept any string
                 event_type = nmos::event_types::wildcard(nmos::event_types::string);
