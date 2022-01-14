@@ -449,7 +449,7 @@ void node_implementation_thread(nmos::node_model &model, slog::base_gate &gate_)
             }
             else if (impl::ports::gain == port)
             {
-                event_type = impl::gain_wildcard;
+                event_type = impl::gain;
                 events_type = nmos::make_events_number_type({-200, 10}, {1000, 10}, {1, 10}, U("gain"));
                 events_state = nmos::make_events_number_state({source_id, flow_id}, {201, 10}, event_type);
             }
@@ -865,7 +865,7 @@ void node_implementation_thread(nmos::node_model &model, slog::base_gate &gate_)
                 
                 modify_resource(model.events_resources, source_id, [&](nmos::resource& resource)
                 {
-                    event_type = impl::gain_wildcard;
+                    event_type = impl::gain;
                     events_type = nmos::make_events_number_type({ -200, 10 }, { 1000, 10 }, { 1, 10 }, U("gain"));
                     nmos::fields::endpoint_state(resource.data) = nmos::make_events_number_state({ source_id, flow_id }, { gain_value, 10 }, event_type);
                 });

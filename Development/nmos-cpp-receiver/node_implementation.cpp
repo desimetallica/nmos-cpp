@@ -269,10 +269,10 @@ void node_implementation_thread(nmos::node_model& model, slog::base_gate& gate_)
                 event_type = nmos::event_types::string;
             } else if (impl::ports::exposure == port) {
                 // accept any exposure
-                event_type = nmos::event_types::wildcard(impl::exposure_wildcard);
+                event_type = impl::exposure_wildcard;
             } else if (impl::ports::gain == port) {
                 // accept any gain
-                event_type = nmos::event_types::wildcard(impl::gain_wildcard);
+                event_type = impl::gain_wildcard;
             }
 
             auto receiver = nmos::make_data_receiver(receiver_id, device_id, nmos::transports::websocket, { host_interface.name }, nmos::media_types::application_json, { event_type }, model.settings);
@@ -977,8 +977,7 @@ nmos::events_ws_message_handler make_node_implementation_events_ws_message_handl
             const auto camera_control_broker_server_address = impl::broker::camera_control_broker_server_address(model.settings);
             const auto camera_control_broker_client_id = impl::broker::camera_control_broker_client_id(model.settings);
 
-            if (nmos::is_matching_event_type(nmos::event_types::wildcard(impl::exposure_wildcard), event_type))
-            {
+            if (nmos::is_matching_event_type(impl::exposure_wildcard, event_type)) {
                 mqtt::async_client client(camera_control_broker_server_address, camera_control_broker_client_id, impl::broker::PERSIST_DIR);
 
                 mqtt::connect_options connOpts;
@@ -1000,9 +999,7 @@ nmos::events_ws_message_handler make_node_implementation_events_ws_message_handl
                 
                 client.disconnect(camera_control_broker_timeout)->wait();
                 slog::log<slog::severities::more_info>(gate, SLOG_FLF) << nmos::stash_category(impl::categories::node_implementation) << "MQTT client disconnected";
-            }
-            if (nmos::is_matching_event_type(nmos::event_types::wildcard(impl::gain_wildcard), event_type))
-            {
+            } else if (nmos::is_matching_event_type(impl::gain_wildcard, event_type)) {
                 mqtt::async_client client(camera_control_broker_server_address, camera_control_broker_client_id, impl::broker::PERSIST_DIR);
 
                 mqtt::connect_options connOpts;
@@ -1024,9 +1021,7 @@ nmos::events_ws_message_handler make_node_implementation_events_ws_message_handl
                 
                 client.disconnect(camera_control_broker_timeout)->wait();
                 slog::log<slog::severities::more_info>(gate, SLOG_FLF) << nmos::stash_category(impl::categories::node_implementation) << "MQTT client disconnected";
-            }
-            else if (nmos::is_matching_event_type(nmos::event_types::string, event_type))
-            {
+            } else if (nmos::is_matching_event_type(nmos::event_types::string, event_type)) {
                 mqtt::async_client client(camera_control_broker_server_address, camera_control_broker_client_id, impl::broker::PERSIST_DIR);
 
                 mqtt::connect_options connOpts;
@@ -1061,9 +1056,7 @@ nmos::events_ws_message_handler make_node_implementation_events_ws_message_handl
                     
                     client.disconnect(camera_control_broker_timeout)->wait();
                 }                
-            }
-            else if (nmos::is_matching_event_type(nmos::event_types::wildcard(nmos::event_types::boolean), event_type))
-            {
+            } else if (nmos::is_matching_event_type(nmos::event_types::wildcard(nmos::event_types::boolean), event_type)) {
                 slog::log<slog::severities::more_info>(gate, SLOG_FLF) << nmos::stash_category(impl::categories::node_implementation) << "Event received: " << std::boolalpha << nmos::fields::payload_boolean_value(payload) << " (" << event_type.name << ")";
             }
         }
