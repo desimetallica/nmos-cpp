@@ -1,0 +1,8 @@
+- name: setup google credentials
+  if: env.SECRET_GOOGLE_CREDENTIALS
+  shell: bash
+  working-directory: ${{ env.GITHUB_WORKSPACE }}
+  run: |
+    mkdir -p gdrive
+    echo "${{ env.SECRET_GOOGLE_CREDENTIALS }}" | openssl base64 -d -A -out gdrive/credentials.json
+    echo "GDRIVE_CREDENTIALS=`pwd`/gdrive/credentials.json" >> $GITHUB_ENV

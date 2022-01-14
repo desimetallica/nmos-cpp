@@ -1,0 +1,9 @@
+{
+    "logging_level": -20,
+    "http_port": 8080,
+    "domain": "local",
+    "label": "sony-nmos-sender-dev",
+    "host_name": "sony-nmos-sender-dev",
+    "how_many": 1,
+    "seed_id": "374d5ebb-4a95-523c-89e9-0096cc1e3bfc"
+}

@@ -5,7 +5,7 @@
         "type": "cppdbg",
         "request": "launch",
         "program": "${workspaceFolder}/build/nmos-cpp-sender",
-        "args": ["${workspaceFolder}/Development/nmos-cpp-sender/sender.json"],
+        "args": ["${workspaceFolder}/Development/nmos-cpp-sender/sender-dev.json"],
         "stopAtEntry": false,
         "cwd": "${workspaceFolder}",
         "environment": [],
