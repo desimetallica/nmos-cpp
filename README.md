@@ -33,6 +33,17 @@ docker build -f ./Development/nmos-cpp-receiver/dockerfile --tag=vsc-nmos-cpp-re
 ```bash
 docker build -f ./Development/nmos-cpp-sender/dockerfile --tag=vsc-nmos-cpp-sender:cameraControl .
 ```  
+
+Dev images are faster to build based on Ubuntu-20.04:
+
+```bash 
+docker build -f ./Development/nmos-cpp-receiver/development.dockerfile --tag=nmos-cpp-camera-control:receiver-dev .
+```  
+
+```bash 
+docker build -f ./Development/nmos-cpp-receiver/development.dockerfile --tag=nmos-cpp-camera-control:receiver-dev . 
+```  
+
 ### Run:
 Nodes:
 ```bash

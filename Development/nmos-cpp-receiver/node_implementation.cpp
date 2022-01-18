@@ -117,8 +117,8 @@ namespace impl
         // destination parameter for cyanview where to move?
         const std::string TOPIC_GAIN { "cy-rcp-18-34/qrm9s7/camhead/status/persist/gain" };
         const std::string TOPIC_EXPOSURE { "cy-rcp-18-34/qrm9s7/camhead/status/persist/exposure" };
-        const std::string CYANVIEW_OFFSET { "cy-rcp-18-80/d9fmmh/camhead/action/add/offset" }; 
-        const std::string CYANVIEW_SHUTTER { "cy-rio-15-173/1ep1mdy/camhead/action/mult/exp" }; 
+        const std::string TOPIC_OFFSET { "cy-rcp-18-80/d9fmmh/camhead/action/add/offset" }; 
+        const std::string TOPIC_SHUTTER { "cy-rio-15-173/1ep1mdy/camhead/action/mult/exp" }; 
         
         // default config if not present into json
         const web::json::field_as_integer_or camera_control_broker_qos{ U("camera_control_broker_qos"), 1 };
@@ -976,88 +976,55 @@ nmos::events_ws_message_handler make_node_implementation_events_ws_message_handl
             //const auto camera_control_broker_port = impl::broker::camera_control_broker_port(model.settings); // not used yet
             const auto camera_control_broker_server_address = impl::broker::camera_control_broker_server_address(model.settings);
             const auto camera_control_broker_client_id = impl::broker::camera_control_broker_client_id(model.settings);
+            
+            mqtt::async_client client(camera_control_broker_server_address, camera_control_broker_client_id, impl::broker::PERSIST_DIR);
 
-            if (nmos::is_matching_event_type(impl::exposure_wildcard, event_type)) {
-                mqtt::async_client client(camera_control_broker_server_address, camera_control_broker_client_id, impl::broker::PERSIST_DIR);
-
-                mqtt::connect_options connOpts;
-                connOpts.set_keep_alive_interval(camera_control_broker_keepalive);
-                connOpts.set_clean_session(true);
-                connOpts.set_connect_timeout(camera_control_broker_timeout);
-                mqtt::token_ptr conntok = client.connect(connOpts);
-                conntok->wait();
-  
-                const nmos::events_number value(nmos::fields::payload_number_value(payload).to_double(), nmos::fields::payload_number_scale(payload));
-                slog::log<slog::severities::more_info>(gate, SLOG_FLF) << nmos::stash_category(impl::categories::node_implementation) << "Event received: " << value.scaled_value() << " (" << event_type.name << ")";
-                
-                //mqtt::message_ptr pubmsg = mqtt::make_message(impl::broker::TOPIC, boost::lexical_cast<std::string>(value.scaled_value()));
-                mqtt::message_ptr pubmsg = mqtt::make_message(impl::broker::TOPIC_EXPOSURE, std::to_string(value.scaled_value()));
-                pubmsg->set_qos(camera_control_broker_qos);
-                
-                client.publish(pubmsg)->wait_for(camera_control_broker_timeout);
-                slog::log<slog::severities::more_info>(gate, SLOG_FLF) << nmos::stash_category(impl::categories::node_implementation) << "Event published on MQTT: " << value.scaled_value() << " (" << event_type.name << ")";
-                
-                client.disconnect(camera_control_broker_timeout)->wait();
-                slog::log<slog::severities::more_info>(gate, SLOG_FLF) << nmos::stash_category(impl::categories::node_implementation) << "MQTT client disconnected";
-            } else if (nmos::is_matching_event_type(impl::gain_wildcard, event_type)) {
-                mqtt::async_client client(camera_control_broker_server_address, camera_control_broker_client_id, impl::broker::PERSIST_DIR);
-
-                mqtt::connect_options connOpts;
-                connOpts.set_keep_alive_interval(camera_control_broker_keepalive);
-                connOpts.set_clean_session(true);
-                connOpts.set_connect_timeout(camera_control_broker_timeout);
-                mqtt::token_ptr conntok = client.connect(connOpts);
-                conntok->wait();
-  
-                const nmos::events_number value(nmos::fields::payload_number_value(payload).to_double(), nmos::fields::payload_number_scale(payload));
-                slog::log<slog::severities::more_info>(gate, SLOG_FLF) << nmos::stash_category(impl::categories::node_implementation) << "Event received: " << value.scaled_value() << " (" << event_type.name << ")";
-                
-                //mqtt::message_ptr pubmsg = mqtt::make_message(impl::broker::TOPIC, boost::lexical_cast<std::string>(value.scaled_value()));
-                mqtt::message_ptr pubmsg = mqtt::make_message(impl::broker::TOPIC_GAIN, std::to_string(value.scaled_value()));
-                pubmsg->set_qos(camera_control_broker_qos);
-                
-                client.publish(pubmsg)->wait_for(camera_control_broker_timeout);
-                slog::log<slog::severities::more_info>(gate, SLOG_FLF) << nmos::stash_category(impl::categories::node_implementation) << "Event published on MQTT: " << value.scaled_value() << " (" << event_type.name << ")";
-                
-                client.disconnect(camera_control_broker_timeout)->wait();
-                slog::log<slog::severities::more_info>(gate, SLOG_FLF) << nmos::stash_category(impl::categories::node_implementation) << "MQTT client disconnected";
-            } else if (nmos::is_matching_event_type(nmos::event_types::string, event_type)) {
-                mqtt::async_client client(camera_control_broker_server_address, camera_control_broker_client_id, impl::broker::PERSIST_DIR);
-
-                mqtt::connect_options connOpts;
-                connOpts.set_keep_alive_interval(camera_control_broker_keepalive);
-                connOpts.set_clean_session(true);
-                connOpts.set_connect_timeout(camera_control_broker_timeout);
-                // event string received 
-                mqtt::token_ptr conntok = client.connect(connOpts);
-                conntok->wait();
-                
-                std::string stringPayload = nmos::fields::payload_string_value(payload);
-
-                slog::log<slog::severities::more_info>(gate, SLOG_FLF) << nmos::stash_category(impl::categories::node_implementation) << "Event received: " << nmos::fields::payload_string_value(payload) << " (" << event_type.name << ")";
-                
-                if (stringPayload.find(",")) {
-                    std::string delimiter = ",";
-                    std::string topic = stringPayload.substr(0, stringPayload.find(delimiter));
-                    stringPayload = stringPayload.erase(0, stringPayload.find(delimiter) + delimiter.length());
-                    slog::log<slog::severities::more_info>(gate, SLOG_FLF) 
-                        << nmos::stash_category(impl::categories::node_implementation) 
-                        << "IS-07 control elements received: " 
-                        << stringPayload 
-                        << "Topic is: "
-                        << topic
-                        << " (" << event_type.name << ")";                  
-
-
-                    mqtt::message_ptr pubmsg = mqtt::make_message(topic, stringPayload);
-                    pubmsg->set_qos(camera_control_broker_qos);
-                    client.publish(pubmsg)->wait_for(camera_control_broker_timeout);
-                    slog::log<slog::severities::more_info>(gate, SLOG_FLF) << nmos::stash_category(impl::categories::node_implementation) << "IS-07 control event published on MQTT: " << nmos::fields::payload_string_value(payload) << " (" << event_type.name << ")";
+            mqtt::connect_options connOpts;
+            connOpts.set_keep_alive_interval(camera_control_broker_keepalive);
+            connOpts.set_clean_session(true);
+            connOpts.set_connect_timeout(camera_control_broker_timeout);
+            
+            mqtt::message_ptr pubMsg;
+            try {              
+                if (nmos::is_matching_event_type(nmos::event_types::wildcard(nmos::event_types::boolean), event_type)) {
+                    slog::log<slog::severities::more_info>(gate, SLOG_FLF) << nmos::stash_category(impl::categories::node_implementation) << "Event received: " << std::boolalpha << nmos::fields::payload_boolean_value(payload) << " (" << event_type.name << ")";
+                } else if (nmos::is_matching_event_type(impl::exposure_wildcard, event_type)) {                  
+                    const nmos::events_number value(nmos::fields::payload_number_value(payload).to_double(), nmos::fields::payload_number_scale(payload));
+                    slog::log<slog::severities::more_info>(gate, SLOG_FLF) << nmos::stash_category(impl::categories::node_implementation) << "Exposure received: " << value.scaled_value() << " (" << event_type.name << ")";
+                    //setting correct TOPIC on EXPOSURE event
+                    pubMsg = mqtt::make_message(impl::broker::TOPIC_EXPOSURE, std::to_string(value.scaled_value()));
+                } else if (nmos::is_matching_event_type(impl::gain_wildcard, event_type)) {
+                    const nmos::events_number value(nmos::fields::payload_number_value(payload).to_double(), nmos::fields::payload_number_scale(payload));
+                    slog::log<slog::severities::more_info>(gate, SLOG_FLF) << nmos::stash_category(impl::categories::node_implementation) << "Gain event received: " << value.scaled_value() << " (" << event_type.name << ")";
+                    //mqtt::message_ptr pubMsg = mqtt::make_message(impl::broker::TOPIC, boost::lexical_cast<std::string>(value.scaled_value()));
+                    //setting correct TOPIC on GAIN event
+                    pubMsg = mqtt::make_message(impl::broker::TOPIC_GAIN, std::to_string(value.scaled_value()));
+                } else if (nmos::is_matching_event_type(nmos::event_types::string, event_type)) {
+                    std::string stringPayload = nmos::fields::payload_string_value(payload);
+                    slog::log<slog::severities::more_info>(gate, SLOG_FLF) << nmos::stash_category(impl::categories::node_implementation) << "Event received: " << nmos::fields::payload_string_value(payload) << " (" << event_type.name << ")";
                     
-                    client.disconnect(camera_control_broker_timeout)->wait();
-                }                
-            } else if (nmos::is_matching_event_type(nmos::event_types::wildcard(nmos::event_types::boolean), event_type)) {
-                slog::log<slog::severities::more_info>(gate, SLOG_FLF) << nmos::stash_category(impl::categories::node_implementation) << "Event received: " << std::boolalpha << nmos::fields::payload_boolean_value(payload) << " (" << event_type.name << ")";
+                    if (stringPayload.find(",")) {
+                        std::string delimiter = ",";
+                        std::string topic = stringPayload.substr(0, stringPayload.find(delimiter));
+                        stringPayload = stringPayload.erase(0, stringPayload.find(delimiter) + delimiter.length());
+                        slog::log<slog::severities::more_info>(gate, SLOG_FLF) << nmos::stash_category(impl::categories::node_implementation) << "IS-07 special control elements received: " << stringPayload << "Topic is: " << topic << " (" << event_type.name << ")";                  
+                        pubMsg = mqtt::make_message(topic, stringPayload);
+                    }               
+                }
+                //setting QoS message
+                pubMsg->set_qos(camera_control_broker_qos);
+                mqtt::token_ptr conntok = client.connect(connOpts);
+                slog::log<slog::severities::more_info>(gate, SLOG_FLF) << nmos::stash_category(impl::categories::node_implementation) << "Connecting to MQTT server: " << camera_control_broker_server_address;              
+                conntok->wait();
+                slog::log<slog::severities::more_info>(gate, SLOG_FLF) << nmos::stash_category(impl::categories::node_implementation) << "Connected to MQTT server: " << camera_control_broker_server_address;
+
+                client.publish(pubMsg)->wait_for(camera_control_broker_timeout);
+                slog::log<slog::severities::more_info>(gate, SLOG_FLF) << nmos::stash_category(impl::categories::node_implementation) << "Event published on MQTT: " << pubMsg->get_payload() << " (" << event_type.name << ")"; 
+                client.disconnect(camera_control_broker_timeout)->wait();
+                slog::log<slog::severities::more_info>(gate, SLOG_FLF) << nmos::stash_category(impl::categories::node_implementation) << "MQTT client disconnected";
+
+            } catch (mqtt::exception& e) {
+                slog::log<slog::severities::error>(gate, SLOG_FLF) << "MQTT error: " << e.what() << " [" << e.get_error_str() << "]";
             }
         }
     }, gate);
