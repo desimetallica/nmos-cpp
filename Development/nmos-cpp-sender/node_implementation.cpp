@@ -25,6 +25,7 @@
 #include "nmos/events_resources.h"
 #include "nmos/group_hint.h"
 #include "nmos/interlace_mode.h"
+#include "nmos/api_utils.h"
 #ifdef HAVE_LLDP
 #include "nmos/lldp_manager.h"
 #endif
@@ -874,13 +875,29 @@ void node_implementation_thread(nmos::node_model &model, slog::base_gate &gate_)
             slog::log<slog::severities::more_info>(gate, SLOG_FLF) << "Gain event updated: " << gain;
             
             model.notify();
-            res.headers().add(U("Access-Control-Allow-Origin"), U("*"));
+            //res.headers().add(web::http::cors::header_names::allow_origin, U("*"));
+            res = nmos::details::add_cors_headers(res);
+            res.set_status_code(web::http::status_codes::OK);
             res.set_body(gain);
-            set_reply(res, web::http::status_codes::OK);
+            //set_reply(res, web::http::status_codes::OK);
 
             return true; }); });
 
-    web::http::experimental::listener::http_listener extra_listener(web::http::experimental::listener::make_listener_uri(web::http::experimental::listener::host_wildcard, impl::fields::extra_port(model.settings)));
+    web::http::experimental::listener::http_listener extra_listener(
+        web::http::experimental::listener::make_listener_uri(
+            web::http::experimental::listener::host_wildcard, impl::fields::extra_port(model.settings)
+        )
+    );
+    // extra_listener.support(web::http::methods::OPTIONS, )
+    extra_listener.support(web::http::methods::OPTIONS,[](web::http::http_request req){
+        web::http::http_response response(web::http::status_codes::OK);
+        response.headers().add(U("Allow"), U("PATCH, POST, OPTIONS"));
+        response.headers().add(U("Access-Control-Allow-Origin"), U("*"));
+        response.headers().add(U("Access-Control-Allow-Methods"), U("PATCH, POST, OPTIONS"));
+        response.headers().add(U("Access-Control-Allow-Headers"), U("Content-Type"));
+        // response = nmos::details::add_cors_headers(response);
+        req.reply(response);
+    });
     extra_listener.support(extra_api);
     web::http::experimental::listener::http_listener_guard extra_listener_guard(extra_listener);
 
