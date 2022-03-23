@@ -129,7 +129,11 @@ namespace impl
         const web::json::field_as_string_or camera_control_broker_client_id{ U("camera_control_broker_client_id"), "nmos_client" };
 
         const web::json::field_as_string_or camera_control_broker_test_topic{ U("camera_control_broker_test_topic"), "cy-rio-15-173/1ep1mdy/camhead/action/mult/exp" };
-
+        const web::json::field_as_string_or camera_control_broker_gain_topic{ U("camera_control_broker_gain_topic"), "cy-rcp-18-34/qrm9s7/camhead/status/persist/gain" };
+        const web::json::field_as_string_or camera_control_broker_exposure_topic{ U("camera_control_broker_exposure_topic"), "cy-rcp-18-34/qrm9s7/camhead/status/persist/exposure" };
+        const web::json::field_as_string_or camera_control_offset_exposure_topic{ U("camera_control_broker_offset_topic"), "cy-rcp-18-80/d9fmmh/camhead/action/add/offset" };
+        const web::json::field_as_string_or camera_control_broker_shutter_topic{ U("camera_control_broker_shutter_topic"), "cy-rcp-18-34/qrm9s7/camhead/status/persist/shutter" };
+        
         //persist folder not so useful for now
         const std::string PERSIST_DIR {"./persist"};
     }
@@ -976,6 +980,8 @@ nmos::events_ws_message_handler make_node_implementation_events_ws_message_handl
             //const auto camera_control_broker_port = impl::broker::camera_control_broker_port(model.settings); // not used yet
             const auto camera_control_broker_server_address = impl::broker::camera_control_broker_server_address(model.settings);
             const auto camera_control_broker_client_id = impl::broker::camera_control_broker_client_id(model.settings);
+            const auto camera_control_gain_topic = impl::broker::camera_control_broker_gain_topic(model.settings);
+            const auto camera_control_exposure_topic = impl::broker::camera_control_broker_exposure_topic(model.settings);
             
             mqtt::async_client client(camera_control_broker_server_address, camera_control_broker_client_id, impl::broker::PERSIST_DIR);
 
@@ -992,13 +998,14 @@ nmos::events_ws_message_handler make_node_implementation_events_ws_message_handl
                     const nmos::events_number value(nmos::fields::payload_number_value(payload).to_double(), nmos::fields::payload_number_scale(payload));
                     slog::log<slog::severities::more_info>(gate, SLOG_FLF) << nmos::stash_category(impl::categories::node_implementation) << "Exposure received: " << value.scaled_value() << " (" << event_type.name << ")";
                     //setting correct TOPIC on EXPOSURE event
-                    pubMsg = mqtt::make_message(impl::broker::TOPIC_EXPOSURE, std::to_string(value.scaled_value()));
+                    std::string exposure_topic = impl::broker::camera_control_broker_exposure_topic;
+                    pubMsg = mqtt::make_message(camera_control_exposure_topic, std::to_string(value.scaled_value()));
                 } else if (nmos::is_matching_event_type(impl::gain_wildcard, event_type)) {
                     const nmos::events_number value(nmos::fields::payload_number_value(payload).to_double(), nmos::fields::payload_number_scale(payload));
                     slog::log<slog::severities::more_info>(gate, SLOG_FLF) << nmos::stash_category(impl::categories::node_implementation) << "Gain event received: " << value.scaled_value() << " (" << event_type.name << ")";
                     //mqtt::message_ptr pubMsg = mqtt::make_message(impl::broker::TOPIC, boost::lexical_cast<std::string>(value.scaled_value()));
                     //setting correct TOPIC on GAIN event
-                    pubMsg = mqtt::make_message(impl::broker::TOPIC_GAIN, std::to_string(value.scaled_value()));
+                    pubMsg = mqtt::make_message(camera_control_gain_topic, std::to_string(value.scaled_value()));
                 } else if (nmos::is_matching_event_type(nmos::event_types::string, event_type)) {
                     std::string stringPayload = nmos::fields::payload_string_value(payload);
                     slog::log<slog::severities::more_info>(gate, SLOG_FLF) << nmos::stash_category(impl::categories::node_implementation) << "Event received: " << nmos::fields::payload_string_value(payload) << " (" << event_type.name << ")";

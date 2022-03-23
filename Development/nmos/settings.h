@@ -212,7 +212,19 @@ namespace nmos
         // camera_control_broker_client_id [node]: MQTT client id 
         const web::json::field_as_string_or camera_control_broker_client_id{ U("camera_control_broker_client_id"), U("nmos_client") };
     
+        // camera_control_broker_gain_topic [node]: camera control gain topic  
+        const web::json::field_as_string_or camera_control_broker_gain_topic{ U("camera_control_broker_gain_topic"), U("cy-rcp-18-34/qrm9s7/camhead/status/persist/gain") };
+    
+        // camera_control_broker_exposure_topic [node]: camera control exposure topic  
+        const web::json::field_as_string_or camera_control_broker_exposure_topic{ U("camera_control_broker_exposure_topic"), U("cy-rcp-18-34/qrm9s7/camhead/status/persist/exposure") };
+    
+        // camera_control_broker_offset_topic [node]: camera control offset topic  
+        const web::json::field_as_string_or camera_control_offset_exposure_topic{ U("camera_control_broker_offset_topic"), U("cy-rcp-18-80/d9fmmh/camhead/action/add/offset") };
+
+        // camera_control_broker_shutter_topic [node]: camera control shutter topic  
+        const web::json::field_as_string_or camera_control_broker_shutter_topic{ U("camera_control_broker_shutter_topic"), U("cy-rcp-18-34/qrm9s7/camhead/status/persist/shutter") };
     }   
+
 
     // Configuration settings and defaults for experimental extensions
     namespace experimental
