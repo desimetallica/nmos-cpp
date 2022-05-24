@@ -116,7 +116,7 @@ namespace impl
     {
         // destination parameter for cyanview where to move?
         const std::string TOPIC_GAIN { "cy-rcp-18-34/qrm9s7/camhead/status/persist/gain" };
-        const std::string TOPIC_EXPOSURE { "cy-rcp-18-34/qrm9s7/camhead/status/persist/exposure" };
+        const std::string TOPIC_EXPOSURE { "cy-rcp-18-80/mqm2nr/camhead/action/set/exp" };
         const std::string TOPIC_OFFSET { "cy-rcp-18-80/d9fmmh/camhead/action/add/offset" }; 
         const std::string TOPIC_SHUTTER { "cy-rio-15-173/1ep1mdy/camhead/action/mult/exp" }; 
         

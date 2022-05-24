@@ -21,6 +21,22 @@ The source code has been modified to include some functionalities required and a
 - Created the [nmos-cpp-receiver](/Development/nmos-cpp-receiver/node_implementation.cpp) provides an IS-07 receiver of events in this node it is also present an MQTT publisher designed to interact with a remote MQTT server
 
 Both sender and receiver nodes can be packeged inside a docker image, you can build by yourself the image with the provided dockerfile.
+You can find a functional docker image at [desimetallica](https://hub.docker.com/r/desimetallica/nmos-cpp-camera-control). 
+
+### nmos-cpp-sender
+the nmos-cpp-sender node expose 3 http methods on port 9999:
+
+- control (POST, general purpose, here you can specify the destination mqtt topic and his payload like: "cy-rio-15-173/1ep1mdy/camhead/action/mult/exp,2.9")
+- exposure (PATCH)
+- gain (PATCH)
+
+This three methods are used by the camera-control-gui interface in order to send the set values to the chain.
+It is possible to test the three methods by using curl commands like:
+- control: curl -d "cy-rio-15-173/1ep1mdy/camhead/action/mult/exp,2.9" -X POST http://172.17.0.7:9999/control -v
+- exposure: curl -X PATCH http://nmos-cpp-sender-ip:9999/exposure --verbose -d "30.0"
+- gain: curl -X PATCH http://nmos-cpp-sender-ip:9999/gain --verbose -d "32.0"
+ 
+ Please note that the measurement propagated through the IS-07 event chain are scaled by a factor of 10. Therefore if you want to publish at the end of the chain in the MQTT broker the exposure value of 30.0 you should push a PATCH with payload "300.0". 
 
 ## Build and run docker images
 
